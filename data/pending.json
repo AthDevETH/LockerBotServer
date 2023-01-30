@@ -1,0 +1,30 @@
+[
+  {
+    "user": "TEST",
+    "pair": "0x100DEE1f76E9Eb9a09D700e31Ae5E1fe8a633efF",
+    "path": [
+      "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "0x62f048eB621A26aDDD02a9A256dd3611396271c3"
+    ],
+    "tokensBought": "1736109314829344047685266917",
+    "purchaseAmt": "10000000000000000",
+    "type": "weth",
+    "amountSold": 0,
+    "profit": 0,
+    "tx": ["test-buy"]
+  },
+  {
+    "user": "TEST",
+    "pair": "0x0931Cf461d3C744ec3fb2B69F7cA5207131345B9",
+    "path": [
+      "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "0x82b30acb5F21ca671fC6a14cF322edc4D3c05af3"
+    ],
+    "tokensBought": "1037505336435706404937",
+    "purchaseAmt": "10000000000000000",
+    "type": "weth",
+    "amountSold": 0,
+    "profit": 0,
+    "tx": ["test-buy"]
+  }
+]

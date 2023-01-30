@@ -1,0 +1,20 @@
+{
+  "wethBuyAmount": 0.01,
+  "usdcBuyAmount": 10,
+  "usdtBuyAmount": 15,
+  "daiBuyAmount": 1,
+  "percentToSell": 50,
+  "multiplierTarget": 2,
+  "tradeWeth": true,
+  "tradeUsdc": true,
+  "tradeUsdt": true,
+  "tradeDai": true,
+  "startUnicrypt": true,
+  "startTeamFin": true,
+  "resume": true,
+  "monitorLength": 60000,
+  "cyclesToTimeout": 22,
+  "privateKey": "",
+  "address": "",
+  "rpc": "wss://flashy-long-wish.discover.quiknode.pro/3670abd6e94008e5165d583b5cdd3a6908f968c9/"
+}
