@@ -4,7 +4,7 @@ require('express-async-errors');
 const cors = require('cors');
 const http = require('http');
 const apiRoutes = require('./routes');
-const lockerBot = require('./services/lockerBot');
+const lockerBot = require('./services/lockerBot2');
 const setupWebsocketServer = require('./services/websocket');
 const uncaughtException = require('./middleware/uncaughtException');
 
