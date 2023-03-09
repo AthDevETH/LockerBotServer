@@ -592,12 +592,15 @@ class LockerBot {
     );
     const base = await this.web3.eth.getGasPrice();
     const gas = new BN(base.toString()).add(new BN("4000000000"));
-    console.log(gas);
+    const baseGasLimit = await transaction.estimateGas({ from: address });
+    const gasLimit = parseInt(baseGasLimit.toString());
+    const gasLimitBuffer = parseInt(gasLimit * 0.5);
+
     const signed = await this.web3.eth.accounts.signTransaction(
       {
         to: book.uniswap.router,
         data: transaction.encodeABI(),
-        gas: await transaction.estimateGas({ from: address }), // await transaction.estimateGas({ from: address }),
+        gas: (gasLimit + gasLimitBuffer).toString(), // await transaction.estimateGas({ from: address }),
         gasPrice: gas.toString(),
       },
       privateKey
@@ -618,11 +621,15 @@ class LockerBot {
       );
     const base = await this.web3.eth.getGasPrice();
     const gas = new BN(base.toString()).add(new BN("4000000000"));
+    const baseGasLimit = await transaction.estimateGas({ from: address });
+    const gasLimit = parseInt(baseGasLimit.toString());
+    const gasLimitBuffer = parseInt(gasLimit * 0.5);
+
     const signed = await this.web3.eth.accounts.signTransaction(
       {
         to: book.uniswap.router,
         data: transaction.encodeABI(),
-        gas: await transaction.estimateGas({ from: address }), // await transaction.estimateGas({ from: address }),
+        gas: (gasLimit + gasLimitBuffer).toString(), // await transaction.estimateGas({ from: address }),
         gasPrice: gas.toString(),
       },
       privateKey
