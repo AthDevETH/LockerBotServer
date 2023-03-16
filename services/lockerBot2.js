@@ -245,10 +245,10 @@ class LockerBot {
 
     const getTokenA = pairContract.methods.token0();
     const getTokenB = pairContract.methods.token1();
-
+    let tokenA, tokenB;
     try {
-      const tokenA = await getTokenA.call();
-      const tokenB = await getTokenB.call();
+      tokenA = await getTokenA.call();
+      tokenB = await getTokenB.call();
       console.log(tokenB);
       await this._checkPairEligible(
         Web3.utils.toChecksumAddress(tokenA),
@@ -257,7 +257,9 @@ class LockerBot {
       );
     } catch (err) {
       console.log(err);
-      console.log(`Not a liquidity pool ${tokenA} ${tokenB}`);
+      console.log(
+        `Not a liquidity pool pairAddress: ${pairAddress}, tokenA: ${tokenA}, tokenB: ${tokenB}, timestamp: ${Date.now()}`
+      );
     }
   }
 
