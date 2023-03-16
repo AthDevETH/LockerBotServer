@@ -575,6 +575,21 @@ class LockerBot {
       toSwap = new BN(balance)
         .mul(new BN(token.percentToSell.toString()))
         .div(new BN("100"));
+
+      const getAllowance = contract.methods.allowance(
+        this.web3.eth.accounts.privateKeyToAccount(privateKey),
+        this.routerContract.options.address
+      );
+      const allowance = await getAllowance.call();
+
+      if (new BN(allowance).isZero()) {
+        await this._approve(
+          token,
+          token.address,
+          contract,
+          miscConstants.MAX_UINT_256
+        );
+      }
     }
     try {
       return await this._swap_(toSwap, path, address, privateKey);
