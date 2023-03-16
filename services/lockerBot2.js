@@ -582,6 +582,7 @@ class LockerBot {
         this.routerContract.options.address
       );
       const allowance = await getAllowance.call();
+      console.log("allowance", allowance.toString());
 
       if (new BN(allowance).isZero()) {
         console.log("need approval");
