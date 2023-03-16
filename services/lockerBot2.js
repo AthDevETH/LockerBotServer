@@ -564,6 +564,7 @@ class LockerBot {
   }
 
   async _swap(token, path, isBuy) {
+    console.log("Inside _swap, isBuy:", isBuy);
     const { address, privateKey } = token.Wallet;
     let toSwap;
     if (isBuy) {
@@ -583,6 +584,7 @@ class LockerBot {
       const allowance = await getAllowance.call();
 
       if (new BN(allowance).isZero()) {
+        console.log("need approval");
         await this._approve(
           token,
           token.address,
