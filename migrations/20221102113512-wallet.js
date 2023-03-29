@@ -1,10 +1,10 @@
-'use strict';
+"use strict";
 
-const { DataTypes } = require('sequelize');
+const { DataTypes } = require("sequelize");
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('Wallets', {
+    await queryInterface.createTable("Wallets", {
       id: {
         type: Sequelize.UUID,
         defaultValue: Sequelize.UUIDV4,
@@ -25,11 +25,11 @@ module.exports = {
       },
       startUnicrypt: {
         type: DataTypes.BOOLEAN,
-        defaultValue: false
+        defaultValue: false,
       },
       startTeamFin: {
         type: DataTypes.BOOLEAN,
-        defaultValue: false
+        defaultValue: false,
       },
       rpc: {
         type: DataTypes.STRING,
@@ -44,10 +44,14 @@ module.exports = {
         type: DataTypes.TIME,
         defaultValue: DataTypes.NOW,
       },
+      chainId: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+      },
     });
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable('Wallets');
+    await queryInterface.dropTable("Wallets");
   },
 };
