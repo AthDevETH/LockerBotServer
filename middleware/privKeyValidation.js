@@ -1,7 +1,7 @@
 const { models } = require('../services/storage');
 const web3Pool = require('../services/web3Pool');
 
-const web3 = web3Pool.getNode();
+const web3 = web3Pool.getNode(1);
 
 module.exports.privKeyValidation = async (req, res, next) => {
   const { privateKey, address } = req.body;

@@ -1,4 +1,4 @@
-const Web3 = require('web3');
+const Web3 = require("web3");
 
 const DEFAULT_WEB3_OPTIONS = {
   reconnect: {
@@ -9,16 +9,25 @@ const DEFAULT_WEB3_OPTIONS = {
   },
 };
 
+// TODO: Assign a respective chainId
 const DEFAULT_RPC_NODES = [
   // 'wss://rpc-mumbai.maticvigil.com/ws/v1/93de006517419d731d6585768b83477ed09e8d15',
   // 'wss://flashy-long-wish.discover.quiknode.pro/3670abd6e94008e5165d583b5cdd3a6908f968c9/',
   // 'wss://long-skilled-arm.discover.quiknode.pro/a7ea386f58647eaf12929eb0e4501f8d3b76e0ed/',
-  'wss://late-radial-pine.bsc.discover.quiknode.pro/0775a8f112a7e5c30431e161161e894e59268132/'
+  // 'wss://late-radial-pine.bsc.discover.quiknode.pro/0775a8f112a7e5c30431e161161e894e59268132/'
+  {
+    url: "wss://long-skilled-arm.discover.quiknode.pro/a7ea386f58647eaf12929eb0e4501f8d3b76e0ed/",
+    chainId: 1,
+  },
+  {
+    url: "wss://late-radial-pine.bsc.discover.quiknode.pro/0775a8f112a7e5c30431e161161e894e59268132/",
+    chainId: 56,
+  },
 ];
 
 class Web3Pool {
   constructor() {
-    this.pool = new Set();
+    this.pool = [];
     this.dedicatedNodes = new Map();
 
     this.init(DEFAULT_RPC_NODES);
@@ -26,12 +35,12 @@ class Web3Pool {
 
   init(rpcNodes) {
     for (const rpcNode of rpcNodes) {
-      const provider = new Web3.providers.WebsocketProvider(rpcNode, {
+      const provider = new Web3.providers.WebsocketProvider(rpcNode.url, {
         ...DEFAULT_WEB3_OPTIONS,
       });
 
       const web3 = new Web3(provider);
-      this.pool.add(web3);
+      this.pool.push({ web3, chainId: rpcNode.chainId });
     }
   }
 
@@ -47,7 +56,7 @@ class Web3Pool {
     const node = this.dedicatedNodes.get(rpcNode);
 
     if (node) {
-      throw 'RpcNode not found';
+      throw "RpcNode not found";
     }
 
     node.currentProvider.disconnect();
@@ -59,18 +68,10 @@ class Web3Pool {
     return this.dedicatedNodes.has(rpcNode);
   }
 
-  getNode(rpcNode) {
-    if (rpcNode) {
-      const node = this.dedicatedNodes.get(rpcNode);
+  getNode(chainId) {
+    const pool = this.pool.find((pool) => pool.chainId === chainId);
 
-      if (node) return node;
-    }
-
-    return this._getRandomRpcNode();
-  }
-
-  _getRandomRpcNode() {
-    return [...this.pool][Math.floor(Math.random() * this.pool.size)];
+    return pool.web3;
   }
 }
 

@@ -1,7 +1,7 @@
 const bind = require("lodash/bind");
 const isEmpty = require("lodash/isEmpty");
 const Web3 = require("web3");
-const ethers = require("ethers");
+// const ethers = require("ethers");
 const { BN } = require("@openzeppelin/test-helpers");
 const web3Pool = require("./web3Pool");
 const { models } = require("./storage");
@@ -24,16 +24,20 @@ const checkIfNew = require("./checkOldToken");
 
 class LockerBot {
   constructor() {
-    this.web3 = web3Pool.getNode();
-    this.ethers = ethers;
-    this.unicryptContract = null;
-    this.teamFinanceContract = null;
-    this.routerContract = null;
+    this.web3 = {
+      1: web3Pool.getNode(1),
+      56: web3Pool.getNode(56),
+    };
+    this.unicryptContract = {};
+    this.teamFinanceContract = {};
+    this.routerContract = {
+      1: null,
+      56: null,
+    };
     this.tokenIds = {};
     this.monitorPairs = new Map();
-    this.unicryptId = null;
-    this.teamFinanceId = null;
-    this.transactions = null;
+    this.unicryptId = {};
+    this.teamFinanceId = {};
     this.events = events;
   }
 
@@ -44,10 +48,16 @@ class LockerBot {
     await this.initContracts();
     console.log("starting 2");
 
-    this.routerContract = new this.web3.eth.Contract(
-      routerABI,
-      book.uniswap.router
-    );
+    this.routerContract = {
+      1: new this.web3[1].eth.Contract(
+        routerABI,
+        book.networks[1].uniswap.router
+      ),
+      56: new this.web3[56].eth.Contract(
+        routerABI,
+        book.networks[56].uniswap.router
+      ),
+    };
 
     this.events.subscribe(
       this.events.WALLET_CHANGED_EVENT,
@@ -79,12 +89,11 @@ class LockerBot {
     );
 
     this.events.subscribe(this.events.TRIGGER_SALE_EVENT, async (pair) => {
-      console.log(pair);
       // we should check if monitor is not attempting a sale at this time too. Would probably need new tracking variable for it
 
       try {
-        const tokenContract = this._createERC20TokenContract(pair.tokenB);
-        const paymentContract = this._createERC20TokenContract(pair.tokenA);
+        const tokenContract = this._createERC20TokenContract(pair.tokenB, pair.Token.Wallet.chainId);
+        const paymentContract = this._createERC20TokenContract(pair.tokenA, pair.Token.Wallet.chainId);
         const getPaymentBalance = paymentContract.methods.balanceOf(
           pair.Token.Wallet.address
         );
@@ -96,7 +105,8 @@ class LockerBot {
           toSwap,
           [pair.tokenB, pair.tokenA],
           pair.Token.Wallet.address,
-          pair.Token.Wallet.privateKey
+          pair.Token.Wallet.privateKey,
+          pair.Token.Wallet.chainId
         );
         console.log("swapped");
         const paymentAfter = await getPaymentBalance.call();
@@ -136,7 +146,7 @@ class LockerBot {
 
     this.events.subscribe(this.events.TRIGGER_APPROVE_EVENT, async (token) => {
       try {
-        const contract = this._createERC20TokenContract(token.address);
+        const contract = this._createERC20TokenContract(token.address, token.Wallet.chainId);
 
         await this._approve(
           token,
@@ -144,9 +154,11 @@ class LockerBot {
           contract,
           miscConstants.MAX_UINT_256
         );
+
       } catch (err) {
         throw new TransactionError(err.message);
       }
+      return true;
     });
   }
 
@@ -156,92 +168,117 @@ class LockerBot {
 
   async checkContracts() {
     const activeWallets = await models.Wallet.findActiveWallets();
-    console.log("activeWallets", activeWallets);
+    console.log("Total activeWallets:", activeWallets.length);
 
-    const startUnicrypt = activeWallets.some((wallet) => wallet.startUnicrypt);
-    const startTeamFin = activeWallets.some((wallet) => wallet.startTeamFin);
-    console.log("startUnicrypt", startUnicrypt);
-    console.log("!this.unicryptContract", this.unicryptContract);
+    let startUnicryptChainId = new Set(),
+      startTeamfinChainId = new Set();
 
-    if (startUnicrypt && !this.unicryptContract) {
-      this.initUnicrypt(true);
+    for (const wallet of activeWallets) {
+      if (wallet.startUnicrypt) {
+        startUnicryptChainId.add(wallet.chainId);
+      }
+      if (wallet.startTeamFin) {
+        startTeamfinChainId.add(wallet.chainId);
+      }
     }
 
-    if (startTeamFin && !this.teamFinanceContract) {
-      this.initTeamFinance(true);
+    console.log("startUnicrypt", startUnicryptChainId.length != 0);
+    console.log("startTeamFin", startTeamfinChainId.length != 0);
+
+    this.initUnicrypt(Array.from(startUnicryptChainId));
+    this.initTeamFinance(Array.from(startTeamfinChainId));
+  }
+
+  initUnicrypt(chainIds) {
+    const chainIdsToRemove = book.supportedChainIds.filter(function (obj) {
+      return chainIds.indexOf(obj) == -1;
+    });
+
+    // Unsubscribing
+    for (const chainIdToRemove of chainIdsToRemove) {
+      if (
+        this.unicryptContract[chainIdToRemove] &&
+        this.unicryptContract[chainIdToRemove].options
+      ) {
+        this.unicryptContract[
+          chainIdToRemove
+        ].options.requestManager.removeSubscription(
+          this.unicryptId[chainIdToRemove]
+        );
+
+        this.unicryptContract[chainIdToRemove] = null;
+        return;
+      }
     }
 
-    if (!startUnicrypt && this.unicryptContract) {
-      this.initUnicrypt(false);
-    }
+    // Subscribing
+    for (const chainId of chainIds) {
+      console.log("online unicrypt on chainId:", chainId);
+      this.unicryptContract[chainId] = new this.web3[chainId].eth.Contract(
+        unicryptABI,
+        book.networks[chainId].lockers.unicrypt
+      );
 
-    if (!startTeamFin && this.teamFinanceContract) {
-      this.initTeamFinance(false);
+      this.unicryptContract[chainId].events
+        .onDeposit({}, function (error, event) {})
+        .on("connected", (id) => {
+          console.log("connected", id);
+          this.unicryptId[chainId] = id;
+        })
+        .on("data", (event) => {
+          console.log(`data on chainId: ${chainId} `, event);
+          this._checkLiquidityPool(event.returnValues.lpToken, chainId);
+        });
     }
   }
 
-  initUnicrypt(shouldStart) {
-    if (
-      !shouldStart &&
-      this.unicryptContract &&
-      this.unicryptContract.options
-    ) {
-      this.unicryptContract.options.requestManager.removeSubscription(
-        this.unicryptId
-      );
+  initTeamFinance(chainIds) {
+    const chainIdsToRemove = book.supportedChainIds.filter(function (obj) {
+      return chainIds.indexOf(obj) == -1;
+    });
 
-      this.unicryptContract = null;
-      return;
-    }
-    console.log("online unicrypt");
-    this.unicryptContract = new this.web3.eth.Contract(
-      unicryptABI,
-      book.lockers.unicrypt
-    );
+    // Unsubscribing
+    for (const chainIdToRemove of chainIdsToRemove) {
+      if (
+        this.teamFinanceContract[chainIdToRemove] &&
+        this.teamFinanceContract[chainIdToRemove].options
+      ) {
+        this.teamFinanceContract[
+          chainIdToRemove
+        ].options.requestManager.removeSubscription(
+          this.teamFinanceId[chainIdToRemove]
+        );
 
-    this.unicryptContract.events
-      .onDeposit({}, function (error, event) {})
-      .on("connected", (id) => {
-        console.log("connected", id);
-        this.unicryptId = id;
-      })
-      .on("data", (event) => {
-        console.log("data", event);
-        this._checkLiquidityPool(event.returnValues.lpToken);
-      });
-  }
-
-  initTeamFinance(shouldStart) {
-    if (
-      !shouldStart &&
-      this.teamFinanceContract &&
-      this.teamFinanceContract.options
-    ) {
-      this.teamFinanceContract.options.requestManager.removeSubscription(
-        this.teamFinanceId
-      );
-      this.teamFinanceContract = null;
-      return;
+        this.teamFinanceContract[chainIdToRemove] = null;
+        return;
+      }
     }
 
-    this.teamFinanceContract = new this.web3.eth.Contract(
-      teamFinanceABI,
-      book.lockers.teamFin
-    );
-    console.log("online teamfin");
-    this.teamFinanceContract.events
-      .Deposit({}, function (error, event) {})
-      .on("connected", (id) => {
-        this.teamFinanceId = id;
-      })
-      .on("data", (event) =>
-        this._checkLiquidityPool(event.returnValues.tokenAddress)
+    // Subscribing
+    for (const chainId of chainIds) {
+      console.log("online teamfin on chainId:", chainId);
+      this.teamFinanceContract[chainId] = new this.web3[chainId].eth.Contract(
+        teamFinanceABI,
+        book.networks[chainId].lockers.teamFin
       );
+
+      this.teamFinanceContract[chainId].events
+        .Deposit({}, function (error, event) {})
+        .on("connected", (id) => {
+          this.teamFinanceId[chainId] = id;
+        })
+        .on("data", (event) => {
+          this._checkLiquidityPool(event.returnValues.tokenAddress, chainId);
+        });
+    }
   }
 
-  async _checkLiquidityPool(pairAddress) {
+  async _checkLiquidityPool(pairAddress, chainId) {
     console.log(`==========> Checking LP: ${pairAddress} <==========`);
-    const pairContract = new this.web3.eth.Contract(pairABI, pairAddress);
+    const pairContract = new this.web3[chainId].eth.Contract(
+      pairABI,
+      pairAddress
+    );
 
     const getTokenA = pairContract.methods.token0();
     const getTokenB = pairContract.methods.token1();
@@ -249,33 +286,33 @@ class LockerBot {
     try {
       tokenA = await getTokenA.call();
       tokenB = await getTokenB.call();
-      console.log(tokenB);
       await this._checkPairEligible(
         Web3.utils.toChecksumAddress(tokenA),
         Web3.utils.toChecksumAddress(tokenB),
-        pairAddress
+        pairAddress,
+        chainId
       );
     } catch (err) {
       console.log(err);
       console.log(
-        `Not a liquidity pool pairAddress: ${pairAddress}, tokenA: ${tokenA}, tokenB: ${tokenB}, timestamp: ${Date.now()}`
+        `Not a liquidity pool on chainId: ${chainId} pairAddress: ${pairAddress}, tokenA: ${tokenA}, tokenB: ${tokenB}, timestamp: ${Date.now()}`
       );
     }
   }
 
-  async _checkPairEligible(tokenA, tokenB, pairAddress) {
-    const mappedTokenA = tokenCurrencyMap[tokenA];
-    const mappedTokenB = tokenCurrencyMap[tokenB];
+  async _checkPairEligible(tokenA, tokenB, pairAddress, chainId) {
+    const mappedTokenA = tokenCurrencyMap[chainId][tokenA];
+    const mappedTokenB = tokenCurrencyMap[chainId][tokenB];
 
     const isEligible =
       (mappedTokenA && !mappedTokenB) || (mappedTokenB && !mappedTokenA);
 
     if (isEligible) {
       const eligibleType = mappedTokenA || mappedTokenB;
-      const eligibleToken = currencyTokenMap[eligibleType];
+      const eligibleToken = currencyTokenMap[chainId][eligibleType];
       const counterToken = eligibleToken === tokenA ? tokenB : tokenA;
 
-      const IsNew = await checkIfNew(this.web3, counterToken);
+      const IsNew = await checkIfNew(this.web3[chainId], counterToken, chainId);
       console.log(IsNew);
       if (!IsNew) {
         console.log("token is old");
@@ -300,7 +337,11 @@ class LockerBot {
       }
 
       const buyPairs = newTokens.map((token) =>
-        this._makePurchase(token, { tokenB: counterToken, pairAddress })
+        this._makePurchase(
+          token,
+          { tokenB: counterToken, pairAddress },
+          chainId
+        )
       );
 
       await Promise.all(buyPairs);
@@ -314,7 +355,7 @@ class LockerBot {
       }
       console.log("eligibleToken", eligibleToken);
 
-      console.log("purchasedPairs", purchasedPairs);
+      console.log("total purchasedPairs:", purchasedPairs.length);
 
       purchasedPairs.forEach(async (pair) => {
         this._monitor(pair);
@@ -322,8 +363,8 @@ class LockerBot {
     }
   }
 
-  async _makePurchase(token, { tokenB, pairAddress }) {
-    const tokenBContract = this._createERC20TokenContract(tokenB);
+  async _makePurchase(token, { tokenB, pairAddress }, chainId) {
+    const tokenBContract = this._createERC20TokenContract(tokenB, chainId);
     let swapTx;
     let pair;
     try {
@@ -415,8 +456,11 @@ class LockerBot {
 
   async _monitor(pair) {
     if (this.monitorPairs.has(pair.id)) return;
-
-    const pairContract = new this.web3.eth.Contract(pairABI, pair.address);
+    const chainId = pair.Token.Wallet.chainId;
+    const pairContract = new this.web3[chainId].eth.Contract(
+      pairABI,
+      pair.address
+    );
 
     const pairEventSubscription = {
       eventEmitter: null,
@@ -455,12 +499,15 @@ class LockerBot {
       console.log("Monitor callback is already being executed:", pair.id);
       return;
     }
-    console.log("Inside _monitorCallback", pair);
+    const chainId = pair.Token.Wallet.chainId;
     monitorInfo.insideMonitoringCallback = true;
 
     if (pair.tokensBought === "0") {
       try {
-        const tokenBContract = this._createERC20TokenContract(pair.tokenB);
+        const tokenBContract = this._createERC20TokenContract(
+          pair.tokenB,
+          chainId
+        );
         const getBalance = tokenBContract.methods.balanceOf(
           pair.Token.Wallet.address
         );
@@ -489,7 +536,7 @@ class LockerBot {
       console.log(`>>>>>>>>> MONITOR_CALLBACK ${pair.address}  <<<<<<<<<<`);
 
       const initialPrice = convertPrice(pair.tokenA, pair.initialPrice);
-      const currentValue = await this.routerContract.methods
+      const currentValue = await this.routerContract[chainId].methods
         .getAmountsOut(pair.tokensBought, [pair.tokenB, pair.tokenA])
         .call();
 
@@ -502,7 +549,7 @@ class LockerBot {
         pair.Token.multiplierTarget * parseFloat(initialPrice)
       ) {
         console.log("YES");
-        await this._sell(pair);
+        await this._sell(pair, chainId);
         console.log("CLEARING 1");
 
         monitorInfo.eventEmitter.options.requestManager.removeSubscription(
@@ -517,7 +564,7 @@ class LockerBot {
     monitorInfo.insideMonitoringCallback = false;
   }
 
-  async _sell(pair) {
+  async _sell(pair, chainId) {
     console.log(`==========> SELL TX: ${pair.address} <==========`);
     const toSell = new BN(pair.tokensBought)
       .mul(new BN(pair.Token.percentToSell.toString()))
@@ -525,7 +572,7 @@ class LockerBot {
     console.log("pair.tokensBought", pair.tokensBought.toString());
 
     console.log("toSell", toSell.toString());
-    const paymentToken = this._createERC20TokenContract(pair.tokenA);
+    const paymentToken = this._createERC20TokenContract(pair.tokenA, chainId);
     const getBalance = paymentToken.methods.balanceOf(
       pair.Token.Wallet.address
     );
@@ -544,7 +591,7 @@ class LockerBot {
       new BN(balanceBefore.toString())
     );
     let profit =
-      tokenCurrencyMap[pair.tokenA] === "USDC"
+      tokenCurrencyMap[chainId][pair.tokenA] === "USDC"
         ? parseInt(difference) / 1000000
         : Web3.utils.fromWei(difference);
     profit = profit.toString();
@@ -565,12 +612,12 @@ class LockerBot {
 
   async _swap(token, path, isBuy) {
     console.log("Inside _swap, isBuy:", isBuy);
-    const { address, privateKey } = token.Wallet;
+    const { address, privateKey, chainId } = token.Wallet;
     let toSwap;
     if (isBuy) {
       toSwap = convertBuyAmount(token.address, token.buyAmount);
     } else {
-      const contract = this._createERC20TokenContract(path[0]);
+      const contract = this._createERC20TokenContract(path[0], chainId);
       const getBalance = contract.methods.balanceOf(address);
       const balance = await getBalance.call();
       toSwap = new BN(balance)
@@ -578,47 +625,54 @@ class LockerBot {
         .div(new BN("100"));
 
       const getAllowance = contract.methods.allowance(
-        this.web3.eth.accounts.privateKeyToAccount(privateKey),
-        this.routerContract.options.address
+        address,
+        this.routerContract[chainId].options.address
       );
+
       const allowance = await getAllowance.call();
-      console.log("allowance", allowance.toString());
 
       if (new BN(allowance).isZero()) {
         console.log("need approval");
         await this._approve(
           token,
-          token.address,
+          path[0],
           contract,
           miscConstants.MAX_UINT_256
         );
+
+        const allowance = await getAllowance.call();
+        console.log("allowance after approve", allowance.toString());
       }
     }
+
     try {
-      return await this._swap_(toSwap, path, address, privateKey);
+      return await this._swap_(toSwap, path, address, privateKey, chainId);
     } catch {
-      return await this._swap2_(toSwap, path, address, privateKey);
+      return await this._swap2_(toSwap, path, address, privateKey, chainId);
     }
   }
 
-  async _swap_(toSwap, path, address, privateKey) {
+  async _swap_(toSwap, path, address, privateKey, chainId) {
     const currentTime = Math.round(Date.now() / 1000);
-    const transaction = this.routerContract.methods.swapExactTokensForTokens(
+    const transaction = this.routerContract[
+      chainId
+    ].methods.swapExactTokensForTokens(
       toSwap.toString(),
       "0",
       path,
       address,
       currentTime + 300
     );
-    const base = await this.web3.eth.getGasPrice();
+
+    const base = await this.web3[chainId].eth.getGasPrice();
     const gas = new BN(base.toString()).add(new BN("4000000000"));
     const baseGasLimit = await transaction.estimateGas({ from: address });
     const gasLimit = parseInt(baseGasLimit.toString());
     const gasLimitBuffer = parseInt(gasLimit * 0.5);
 
-    const signed = await this.web3.eth.accounts.signTransaction(
+    const signed = await this.web3[chainId].eth.accounts.signTransaction(
       {
-        to: book.uniswap.router,
+        to: book.networks[chainId].uniswap.router,
         data: transaction.encodeABI(),
         gas: (gasLimit + gasLimitBuffer).toString(), // await transaction.estimateGas({ from: address }),
         gasPrice: gas.toString(),
@@ -626,28 +680,31 @@ class LockerBot {
       privateKey
     );
     console.log("SUCCESS _swap_");
-    return await this.web3.eth.sendSignedTransaction(signed.rawTransaction);
+    return await this.web3[chainId].eth.sendSignedTransaction(
+      signed.rawTransaction
+    );
   }
 
-  async _swap2_(toSwap, path, address, privateKey) {
+  async _swap2_(toSwap, path, address, privateKey, chainId) {
     const currentTime = Math.round(Date.now() / 1000);
-    const transaction =
-      this.routerContract.methods.swapExactTokensForTokensSupportingFeeOnTransferTokens(
-        toSwap.toString(),
-        "0",
-        path,
-        address,
-        currentTime + 300
-      );
-    const base = await this.web3.eth.getGasPrice();
+    const transaction = this.routerContract[
+      chainId
+    ].methods.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+      toSwap.toString(),
+      "0",
+      path,
+      address,
+      currentTime + 300
+    );
+    const base = await this.web3[chainId].eth.getGasPrice();
     const gas = new BN(base.toString()).add(new BN("4000000000"));
     const baseGasLimit = await transaction.estimateGas({ from: address });
     const gasLimit = parseInt(baseGasLimit.toString());
     const gasLimitBuffer = parseInt(gasLimit * 0.5);
 
-    const signed = await this.web3.eth.accounts.signTransaction(
+    const signed = await this.web3[chainId].eth.accounts.signTransaction(
       {
-        to: book.uniswap.router,
+        to: book.networks[chainId].uniswap.router,
         data: transaction.encodeABI(),
         gas: (gasLimit + gasLimitBuffer).toString(), // await transaction.estimateGas({ from: address }),
         gasPrice: gas.toString(),
@@ -655,20 +712,23 @@ class LockerBot {
       privateKey
     );
     console.log("SUCCESS _swap2_");
-    return await this.web3.eth.sendSignedTransaction(signed.rawTransaction);
+    return await this.web3[chainId].eth.sendSignedTransaction(
+      signed.rawTransaction
+    );
   }
 
   // TO DO: lets get balanceOf the token, then approved that amount (+ extra).
   async _approve(token, tokenAddress, tokenContract, amount) {
-    const { address, privateKey } = token.Wallet;
+    const { address, privateKey, chainId } = token.Wallet;
 
     const transaction = tokenContract.methods.approve(
-      book.uniswap.router,
+      book.networks[chainId].uniswap.router,
       amount.toString()
     );
-    const base = await this.web3.eth.getGasPrice();
+
+    const base = await this.web3[chainId].eth.getGasPrice();
     const gas = new BN(base.toString()).add(new BN("4000000000"));
-    const signed = await this.web3.eth.accounts.signTransaction(
+    const signed = await this.web3[chainId].eth.accounts.signTransaction(
       {
         to: tokenAddress,
         data: transaction.encodeABI(),
@@ -677,8 +737,9 @@ class LockerBot {
       },
       privateKey
     );
-    console.log("APPROVED");
-    return await this.web3.eth.sendSignedTransaction(signed.rawTransaction);
+    return await this.web3[chainId].eth.sendSignedTransaction(
+      signed.rawTransaction
+    );
   }
 
   async _getBalanceAndInitialPrice(tokenBContract, token, tokenB) {
@@ -691,8 +752,8 @@ class LockerBot {
     }
   }
 
-  _createERC20TokenContract(tokenAddress) {
-    return new this.web3.eth.Contract(erc20ABI, tokenAddress);
+  _createERC20TokenContract(tokenAddress, chainId) {
+    return new this.web3[chainId].eth.Contract(erc20ABI, tokenAddress);
   }
 }
 

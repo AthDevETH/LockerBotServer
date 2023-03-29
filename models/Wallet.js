@@ -1,5 +1,5 @@
-const { Model, DataTypes, Op } = require('sequelize');
-const { v4: uuid } = require('uuid');
+const { Model, DataTypes, Op } = require("sequelize");
+const { v4: uuid } = require("uuid");
 
 module.exports = (sequelize) => {
   class Wallet extends Model {
@@ -22,12 +22,13 @@ module.exports = (sequelize) => {
       rpc: DataTypes.STRING,
       createdAt: DataTypes.TIME,
       updatedAt: DataTypes.TIME,
+      chainId: DataTypes.INTEGER,
     },
     {
       sequelize,
-      modelName: 'Wallet',
+      modelName: "Wallet",
       timestamps: true,
-    },
+    }
   );
 
   Wallet.beforeCreate((wallet) => (wallet.id = uuid()));

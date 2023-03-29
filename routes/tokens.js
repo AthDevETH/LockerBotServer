@@ -1,16 +1,17 @@
-const router = require('express').Router();
-const pick = require('lodash/pick');
-const { param } = require('express-validator');
-const validation = require('../middleware/validation');
-const { validateTokenBody } = require('../middleware/validateBody');
-const { walletValidation } = require('../middleware/walletValidation');
-const { models } = require('../services/storage');
-const events = require('../services/events');
-const { types: errorTypes } = require('../utils/errors');
+const router = require("express").Router();
+const config = require("../config");
+const pick = require("lodash/pick");
+const { param } = require("express-validator");
+const validation = require("../middleware/validation");
+const { validateTokenBody } = require("../middleware/validateBody");
+const { walletValidation } = require("../middleware/walletValidation");
+const { models } = require("../services/storage");
+const events = require("../services/events");
+const { types: errorTypes } = require("../utils/errors");
 
 router.post(
-  '/:accountId',
-  param('accountId').isEthereumAddress(),
+  "/:accountId",
+  param("accountId").isEthereumAddress(),
   ...validateTokenBody(),
   validation,
   walletValidation((req) => ({
@@ -25,38 +26,69 @@ router.post(
     if (foundToken) {
       return res.status(400).json({
         status: 400,
-        message: 'Token already exists',
+        message: "Token already exists",
+      });
+    }
+    const foundWallet = await models.Wallet.findOne({
+      where: {
+        id: walletId,
+      },
+    });
+    const chainId = foundWallet.dataValues.chainId;
+    const network = config.networks[chainId];
+
+    if (!network) {
+      return res.status(400).json({
+        status: 400,
+        message: "Invalid Token ChainId",
+      });
+    }
+
+    let validToken = false;
+
+    for (const tokenSymbol in network.tokens) {
+      if (network.tokens[tokenSymbol].toLowerCase() === address.toLowerCase()) {
+        validToken = true;
+        break;
+      }
+    }
+
+    if (!validToken) {
+      return res.status(400).json({
+        status: 400,
+        message: "Token does not exist in chainId",
       });
     }
 
     let token;
-4
+
     try {
       token = await models.Token.createAndReturn(req.body);
-      await events.publishSync(events.TRIGGER_APPROVE_EVENT, token);
 
+      await events.publishSync(events.TRIGGER_APPROVE_EVENT, token);
       return token;
     } catch (err) {
       if (err.name === errorTypes.TRANSACTION_ERROR) {
         if (token) {
           await token.destroy();
         }
+        console.log("Token approval failed", err);
 
         return res.status(400).json({
           status: 400,
-          message: 'Token approval failed',
+          message: "Token approval failed",
         });
       }
 
       throw err; // No need to handle 5xx. Will throw 500 in the uncaughtException middleware anyway.
     }
-  },
+  }
 );
 
 router.put(
-  '/:accountId/:id',
-  param('id').isUUID(),
-  param('accountId').isEthereumAddress(),
+  "/:accountId/:id",
+  param("id").isUUID(),
+  param("accountId").isEthereumAddress(),
   ...validateTokenBody(),
   validation,
   async (req, res) => {
@@ -71,16 +103,16 @@ router.put(
     if (!foundWallet) {
       return res.status(404).json({
         status: 404,
-        message: 'Wallet for this account not found',
+        message: "Wallet for this account not found",
       });
     }
 
     const updateBody = pick(req.body, [
-      'buyAmount',
-      'percentToSell',
-      'multiplierTarget',
-      'monitorLength',
-      'cyclesToTimeout',
+      "buyAmount",
+      "percentToSell",
+      "multiplierTarget",
+      "monitorLength",
+      "cyclesToTimeout",
     ]);
 
     await models.Token.update(updateBody, {
@@ -98,14 +130,14 @@ router.put(
     events.publish(events.TOKEN_CHANGED_EVENT, { tokenId: id });
 
     return res.json(updatedPair);
-  },
+  }
 );
 
 /* Get wallet tokens. Throws if trying to create a second token of the same address */
 router.get(
-  '/:accountId/:walletId',
-  param('accountId').isEthereumAddress(),
-  param('walletId').isUUID(),
+  "/:accountId/:walletId",
+  param("accountId").isEthereumAddress(),
+  param("walletId").isUUID(),
   validation,
   walletValidation((req) => ({
     accountId: req.params.accountId,
@@ -116,17 +148,17 @@ router.get(
 
     const pairs = await models.Token.findAll({
       where: { walletId },
-      order: [['updatedAt', 'DESC']],
+      order: [["updatedAt", "DESC"]],
     });
 
     return res.json(pairs);
-  },
+  }
 );
 
 router.get(
-  '/history/:accountId/:walletId',
-  param('accountId').isEthereumAddress(),
-  param('walletId').isUUID(),
+  "/history/:accountId/:walletId",
+  param("accountId").isEthereumAddress(),
+  param("walletId").isUUID(),
   validation,
   walletValidation((req) => ({
     accountId: req.params.accountId,
@@ -138,13 +170,13 @@ router.get(
     const pairs = await models.Token.findAll({
       where: {
         walletId,
-        status: 'Closed',
+        status: "Closed",
       },
-      order: [['updatedAt', 'DESC']],
+      order: [["updatedAt", "DESC"]],
     });
 
     return res.json(pairs);
-  },
+  }
 );
 
 module.exports = router;
