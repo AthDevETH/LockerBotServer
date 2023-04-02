@@ -38,9 +38,6 @@ router.post(
     const { accountId } = req.params;
     let chainId = null;
     try {
-      if(!req.body.rpc) {
-        throw "Please submit a RPC URL";
-      }
       const provider = new Web3.providers.WebsocketProvider(req.body.rpc);
       const web3 = new Web3(provider);
 
