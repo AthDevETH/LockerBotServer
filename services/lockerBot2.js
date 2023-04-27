@@ -224,7 +224,7 @@ class LockerBot {
           console.log("Error connecting to unicrypt", error)
         })
         .on("connected", (id) => {
-          console.log("connected", id);
+          console.log("connected unicryptContract", id);
           this.unicryptId[chainId] = id;
         })
         .on("data", (event) => {
@@ -269,6 +269,7 @@ class LockerBot {
           console.log("Error connecting to teamfinance", error)
         })
         .on("connected", (id) => {
+          console.log("connected teamfin", id);
           this.teamFinanceId[chainId] = id;
         })
         .on("data", (event) => {
@@ -474,15 +475,15 @@ class LockerBot {
       insideMonitoringCallback: false,
     };
 
-    // pairEventSubscription.eventEmitter = pairContract.events
-    //   .Swap({}, function (error, event) {})
-    //   .on("connected", (id) => {
-    //     console.log("connected pair swap event", id);
-    //     pairEventSubscription.subcriptionId = id;
-    //   })
-    //   .on("data", (event) => {
-    //     this._monitorCallback(pair);
-    //   });
+    pairEventSubscription.eventEmitter = pairContract.events
+      .Swap({}, function (error, event) {})
+      .on("connected", (id) => {
+        console.log("connected pair swap event", id);
+        pairEventSubscription.subcriptionId = id;
+      })
+      .on("data", (event) => {
+        this._monitorCallback(pair);
+      });
 
     this.monitorPairs.set(pair.id, pairEventSubscription);
 
