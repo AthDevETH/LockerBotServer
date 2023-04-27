@@ -475,15 +475,15 @@ class LockerBot {
       insideMonitoringCallback: false,
     };
 
-    pairEventSubscription.eventEmitter = pairContract.events
-      .Swap({}, function (error, event) {})
-      .on("connected", (id) => {
-        console.log("connected pair swap event", id);
-        pairEventSubscription.subcriptionId = id;
-      })
-      .on("data", (event) => {
-        this._monitorCallback(pair);
-      });
+    // pairEventSubscription.eventEmitter = pairContract.events
+    //   .Swap({}, function (error, event) {})
+    //   .on("connected", (id) => {
+    //     console.log("connected pair swap event", id);
+    //     pairEventSubscription.subcriptionId = id;
+    //   })
+    //   .on("data", (event) => {
+    //     this._monitorCallback(pair);
+    //   });
 
     this.monitorPairs.set(pair.id, pairEventSubscription);
 
