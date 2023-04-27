@@ -220,7 +220,9 @@ class LockerBot {
       );
 
       this.unicryptContract[chainId].events
-        .onDeposit({}, function (error, event) {})
+        .onDeposit({}, function (error, event) {
+          console.log("Error connecting to unicrypt", error)
+        })
         .on("connected", (id) => {
           console.log("connected", id);
           this.unicryptId[chainId] = id;
@@ -263,7 +265,9 @@ class LockerBot {
       );
 
       this.teamFinanceContract[chainId].events
-        .Deposit({}, function (error, event) {})
+        .Deposit({}, function (error, event) {
+          console.log("Error connecting to teamfinance", error)
+        })
         .on("connected", (id) => {
           this.teamFinanceId[chainId] = id;
         })
