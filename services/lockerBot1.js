@@ -6,10 +6,14 @@ const { BN } = require("@openzeppelin/test-helpers");
 const web3Pool = require("./web3Pool");
 const { models } = require("./storage");
 const events = require("./events");
+const Transactions = require("./transactions");
+const unicryptABI = require("../ABI/unicrypt");
+const teamFinanceABI = require("../ABI/teamLockerABI");
 const routerABI = require("../ABI/routerABI");
 const pairABI = require("../ABI/pairABI");
 const book = require("../config");
 const erc20ABI = require("../ABI/erc20ABI");
+const getRandomInterval = require("../utils/getRandomInterval");
 const { TransactionError } = require("../utils/errors");
 const convertPrice = require("../utils/convertPrice");
 const convertBuyAmount = require("../utils/convertBuyAmount");
@@ -17,19 +21,6 @@ const tokenCurrencyMap = require("../constants/tokenCurrencyMap");
 const currencyTokenMap = require("../constants/currencyTokenMap");
 const miscConstants = require("../constants/misc");
 const checkIfNew = require("./checkOldToken");
-const eventsHandler = require("./handleEvents");
-
-const UNICRYPT_ADDRESSES = [
-  book.networks[1].lockers.unicrypt.toLowerCase(),
-  book.networks[56].lockers.unicrypt.toLowerCase(),
-];
-
-const TEAM_FINANCE_ADDRESSES = [
-  book.networks[1].lockers.teamFin.toLowerCase(),
-  book.networks[56].lockers.teamFin.toLowerCase(),
-];
-
-const addressesToMonitor = [...UNICRYPT_ADDRESSES];
 
 class LockerBot {
   constructor() {
@@ -81,12 +72,12 @@ class LockerBot {
         console.log("tokenId", tokenId);
         if (pairsByTokenId) {
           for (const pair of pairsByTokenId) {
-            // const monitorInfo = this.monitorPairs.get(pair.id.toLowerCase());
-            // monitorInfo.eventEmitter.options.requestManager.removeSubscription(
-            //   monitorInfo.subcriptionId
-            // );
+            const monitorInfo = this.monitorPairs.get(pair.id);
+            monitorInfo.eventEmitter.options.requestManager.removeSubscription(
+              monitorInfo.subcriptionId
+            );
 
-            this.monitorPairs.delete(pair.id.toLowerCase());
+            this.monitorPairs.delete(pair.id);
           }
         }
 
@@ -131,14 +122,14 @@ class LockerBot {
         const totalProfit = new BN(pair.profit.toString()).add(profit);
 
         try {
-          // const monitorInfo = this.monitorPairs.get(pair.id.toLowerCase());
-          // console.log(monitorInfo);
+          const monitorInfo = this.monitorPairs.get(pair.id);
+          console.log(monitorInfo);
 
-          // monitorInfo.eventEmitter.options.requestManager.removeSubscription(
-          //   monitorInfo.subcriptionId
-          // );
+          monitorInfo.eventEmitter.options.requestManager.removeSubscription(
+            monitorInfo.subcriptionId
+          );
 
-          this.monitorPairs.delete(pair.id.toLowerCase());
+          this.monitorPairs.delete(pair.id);
         } catch {
           console.log("monitor not running");
         }
@@ -202,233 +193,98 @@ class LockerBot {
     console.log("startUnicrypt", startUnicryptChainId.length != 0);
     console.log("startTeamFin", startTeamfinChainId.length != 0);
 
-    for (const relChainId of Array.from(
-      new Set([...startUnicryptChainId, ...startTeamfinChainId])
-    )) {
-      this.web3[relChainId].eth
-        .subscribe("newBlockHeaders", async (error, result) => {
-          if (error) return;
-
-          let block = await this.web3[relChainId].eth.getBlock(result.number);
-          if (block != null) {
-            if (block.transactions != null && block.transactions.length != 0) {
-              console.log(
-                "\nChain ID: " +
-                  relChainId +
-                  " Block #" +
-                  result.number +
-                  " has " +
-                  block.transactions.length +
-                  " transactions"
-              );
-
-              for (const txHash of block.transactions) {
-                // Monitors for new locked LP
-                this.web3[relChainId].eth.getTransaction(
-                  txHash,
-                  (err, result) => {
-                    if (
-                      !result.to ||
-                      !addressesToMonitor.includes(result.to.toLowerCase())
-                    )
-                      return;
-                    const input = result.input;
-
-                    const functionSignature = input.slice(0, 10);
-                    const parameters = input.slice(10);
-
-                    if (UNICRYPT_ADDRESSES.includes(result.to.toLowerCase())) {
-                      const lpToken = eventsHandler.handleUnicryptEvent(
-                        functionSignature,
-                        parameters,
-                        this.web3[relChainId]
-                      );
-
-                      this._checkLiquidityPool(lpToken, relChainId);
-                    }
-
-                    if (
-                      TEAM_FINANCE_ADDRESSES.includes(result.to.toLowerCase())
-                    ) {
-                      const lpToken = eventsHandler.handleTeamFinanceEvent(
-                        functionSignature,
-                        parameters,
-                        this.web3[relChainId]
-                      );
-
-                      this._checkLiquidityPool(lpToken, relChainId);
-                    }
-                  }
-                );
-
-                // Monitors Swap events
-                this.web3[relChainId].eth.getTransactionReceipt(
-                  txHash,
-                  async (err, result) => {
-                    if (!result.to || !result.logs || result.logs.length === 0)
-                      return;
-
-                    for (const log of result.logs) {
-                      let pairExists = false;
-                      let pair;
-                      for (const [key, value] of this.monitorPairs.entries()) {
-                        if (
-                          value.pair.address.toLowerCase() ===
-                          log.address.toLowerCase()
-                        ) {
-                          pairExists = true;
-                          pair = value.pair;
-                          break;
-                        }
-                      }
-                      if (!pairExists) continue;
-
-                      try {
-                        log.topics.shift();
-                        const decodedLog = this.web3[
-                          relChainId
-                        ].eth.abi.decodeLog(
-                          [
-                            {
-                              indexed: true,
-                              name: "sender",
-                              type: "address",
-                            },
-                            {
-                              name: "amount0In",
-                              type: "uint256",
-                            },
-                            {
-                              name: "amount1In",
-                              type: "uint256",
-                            },
-                            {
-                              name: "amount0Out",
-                              type: "uint256",
-                            },
-                            {
-                              name: "amount1Out",
-                              type: "uint256",
-                            },
-                            { indexed: true, name: "to", type: "address" },
-                          ],
-                          log.data,
-                          log.topics
-                        );
-
-                        this._monitorCallback(pair);
-                      } catch (err) {
-                      }
-                    }
-                  }
-                );
-              }
-            }
-          }
-        })
-        .on("connected", function (id) {
-          console.log(
-            `newBlockHeaders relChainId: ${relChainId} Connected id`,
-            id
-          );
-        })
-        .on("error", function (error) {
-          console.log("error", error);
-        });
-    }
-
-    // this.initUnicrypt(Array.from(startUnicryptChainId));
-    // this.initTeamFinance(Array.from(startTeamfinChainId));
+    this.initUnicrypt(Array.from(startUnicryptChainId));
+    this.initTeamFinance(Array.from(startTeamfinChainId));
   }
 
-  // initUnicrypt(chainIds) {
-  //   const chainIdsToRemove = book.supportedChainIds.filter(function (obj) {
-  //     return chainIds.indexOf(obj) == -1;
-  //   });
+  initUnicrypt(chainIds) {
+    const chainIdsToRemove = book.supportedChainIds.filter(function (obj) {
+      return chainIds.indexOf(obj) == -1;
+    });
 
-  //   // Unsubscribing
-  //   for (const chainIdToRemove of chainIdsToRemove) {
-  //     if (
-  //       this.unicryptContract[chainIdToRemove] &&
-  //       this.unicryptContract[chainIdToRemove].options
-  //     ) {
-  //       this.unicryptContract[
-  //         chainIdToRemove
-  //       ].options.requestManager.removeSubscription(
-  //         this.unicryptId[chainIdToRemove]
-  //       );
+    // Unsubscribing
+    for (const chainIdToRemove of chainIdsToRemove) {
+      if (
+        this.unicryptContract[chainIdToRemove] &&
+        this.unicryptContract[chainIdToRemove].options
+      ) {
+        this.unicryptContract[
+          chainIdToRemove
+        ].options.requestManager.removeSubscription(
+          this.unicryptId[chainIdToRemove]
+        );
 
-  //       this.unicryptContract[chainIdToRemove] = null;
-  //       return;
-  //     }
-  //   }
+        this.unicryptContract[chainIdToRemove] = null;
+        return;
+      }
+    }
 
-  //   // Subscribing
-  //   for (const chainId of chainIds) {
-  //     console.log("online unicrypt on chainId:", chainId);
-  //     this.unicryptContract[chainId] = new this.web3[chainId].eth.Contract(
-  //       unicryptABI,
-  //       book.networks[chainId].lockers.unicrypt
-  //     );
+    // Subscribing
+    for (const chainId of chainIds) {
+      console.log("online unicrypt on chainId:", chainId);
+      this.unicryptContract[chainId] = new this.web3[chainId].eth.Contract(
+        unicryptABI,
+        book.networks[chainId].lockers.unicrypt
+      );
 
-  //     this.unicryptContract[chainId].events
-  //       .onDeposit({}, function (error, event) {
-  //         console.log("Error connecting to unicrypt", error);
-  //       })
-  //       .on("connected", (id) => {
-  //         console.log("connected unicryptContract", id);
-  //         this.unicryptId[chainId] = id;
-  //       })
-  //       .on("data", (event) => {
-  //         console.log(`data on chainId: ${chainId} `, event);
-  //         this._checkLiquidityPool(event.returnValues.lpToken, chainId);
-  //       });
-  //   }
-  // }
+      this.unicryptContract[chainId].events
+        .onDeposit({}, function (error, event) {
+          console.log("Error connecting to unicrypt", error);
+        })
+        .on("connected", (id) => {
+          console.log("connected unicryptContract", id);
+          this.unicryptId[chainId] = id;
+        })
+        .on("data", (event) => {
+          console.log(`data on chainId: ${chainId} `, event);
+          this._checkLiquidityPool(event.returnValues.lpToken, chainId);
+        });
+    }
+  }
 
-  // initTeamFinance(chainIds) {
-  //   const chainIdsToRemove = book.supportedChainIds.filter(function (obj) {
-  //     return chainIds.indexOf(obj) == -1;
-  //   });
+  initTeamFinance(chainIds) {
+    const chainIdsToRemove = book.supportedChainIds.filter(function (obj) {
+      return chainIds.indexOf(obj) == -1;
+    });
 
-  //   // Unsubscribing
-  //   for (const chainIdToRemove of chainIdsToRemove) {
-  //     if (
-  //       this.teamFinanceContract[chainIdToRemove] &&
-  //       this.teamFinanceContract[chainIdToRemove].options
-  //     ) {
-  //       this.teamFinanceContract[
-  //         chainIdToRemove
-  //       ].options.requestManager.removeSubscription(
-  //         this.teamFinanceId[chainIdToRemove]
-  //       );
+    // Unsubscribing
+    for (const chainIdToRemove of chainIdsToRemove) {
+      if (
+        this.teamFinanceContract[chainIdToRemove] &&
+        this.teamFinanceContract[chainIdToRemove].options
+      ) {
+        this.teamFinanceContract[
+          chainIdToRemove
+        ].options.requestManager.removeSubscription(
+          this.teamFinanceId[chainIdToRemove]
+        );
 
-  //       this.teamFinanceContract[chainIdToRemove] = null;
-  //       return;
-  //     }
-  //   }
+        this.teamFinanceContract[chainIdToRemove] = null;
+        return;
+      }
+    }
 
-  //   // Subscribing
-  //   for (const chainId of chainIds) {
-  //     console.log("online teamfin on chainId:", chainId);
-  //     this.teamFinanceContract[chainId] = new this.web3[chainId].eth.Contract(
-  //       teamFinanceABI,
-  //       book.networks[chainId].lockers.teamFin
-  //     );
+    // Subscribing
+    for (const chainId of chainIds) {
+      console.log("online teamfin on chainId:", chainId);
+      this.teamFinanceContract[chainId] = new this.web3[chainId].eth.Contract(
+        teamFinanceABI,
+        book.networks[chainId].lockers.teamFin
+      );
 
-  //     this.teamFinanceContract[chainId].events
-  //       .Deposit({}, function (error, event) {
-  //         console.log("Error connecting to teamfinance", error);
-  //       })
-  //       .on("connected", (id) => {
-  //         console.log("connected teamfin", id);
-  //         this.teamFinanceId[chainId] = id;
-  //       })
-  //       .on("data", (event) => {
-  //         this._checkLiquidityPool(event.returnValues.tokenAddress, chainId);
-  //       });
-  //   }
-  // }
+      this.teamFinanceContract[chainId].events
+        .Deposit({}, function (error, event) {
+          console.log("Error connecting to teamfinance", error);
+        })
+        .on("connected", (id) => {
+          console.log("connected teamfin", id);
+          this.teamFinanceId[chainId] = id;
+        })
+        .on("data", (event) => {
+          this._checkLiquidityPool(event.returnValues.tokenAddress, chainId);
+        });
+    }
+  }
 
   async _checkLiquidityPool(pairAddress, chainId) {
     console.log(`==========> Checking LP: ${pairAddress} <==========`);
@@ -612,7 +468,7 @@ class LockerBot {
   }
 
   async _monitor(pair) {
-    if (this.monitorPairs.has(pair.id.toLowerCase())) return;
+    if (this.monitorPairs.has(pair.id)) return;
     const chainId = pair.Token.Wallet.chainId;
     const pairContract = new this.web3[chainId].eth.Contract(
       pairABI,
@@ -627,17 +483,17 @@ class LockerBot {
       insideMonitoringCallback: false,
     };
 
-    // pairEventSubscription.eventEmitter = pairContract.events
-    //   .Swap({}, function (error, event) {})
-    //   .on("connected", (id) => {
-    //     console.log("connected pair swap event", id);
-    //     pairEventSubscription.subcriptionId = id;
-    //   })
-    //   .on("data", (event) => {
-    //     this._monitorCallback(pair);
-    //   });
+    pairEventSubscription.eventEmitter = pairContract.events
+      .Swap({}, function (error, event) {})
+      .on("connected", (id) => {
+        console.log("connected pair swap event", id);
+        pairEventSubscription.subcriptionId = id;
+      })
+      .on("data", (event) => {
+        this._monitorCallback(pair);
+      });
 
-    this.monitorPairs.set(pair.id.toLowerCase(), pairEventSubscription);
+    this.monitorPairs.set(pair.id, pairEventSubscription);
 
     // this.tokenIds[pair.tokenId] = this.tokenIds[pair.tokenId] || [];
     // this.tokenIds[pair.tokenId].push(pair);
@@ -645,7 +501,7 @@ class LockerBot {
 
   async _monitorCallback(_pair) {
     const pair = await models.Pair.findSinglePairById(_pair.id);
-    const monitorInfo = this.monitorPairs.get(pair.id.toLowerCase());
+    const monitorInfo = this.monitorPairs.get(pair.id);
     if (pair.status === "Closed") {
       console.log("Pair status is closed for:", pair.address);
       console.log("Wallet Address:", pair.Token.Wallet.address);
@@ -709,10 +565,10 @@ class LockerBot {
         await this._sell(pair, chainId);
         console.log("CLEARING 1");
 
-        // monitorInfo.eventEmitter.options.requestManager.removeSubscription(
-        //   monitorInfo.subcriptionId
-        // );
-        this.monitorPairs.delete(pair.id.toLowerCase());
+        monitorInfo.eventEmitter.options.requestManager.removeSubscription(
+          monitorInfo.subcriptionId
+        );
+        this.monitorPairs.delete(pair.id);
       }
     } catch (err) {
       console.log(err);
