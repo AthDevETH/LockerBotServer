@@ -1,6 +1,8 @@
 const bind = require("lodash/bind");
 const isEmpty = require("lodash/isEmpty");
 const Web3 = require("web3");
+const BigNumberJs = require("bignumber.js");
+
 // const ethers = require("ethers");
 const { BN } = require("@openzeppelin/test-helpers");
 const web3Pool = require("./web3Pool");
@@ -27,6 +29,10 @@ const UNICRYPT_ADDRESSES = [
 const TEAM_FINANCE_ADDRESSES = [
   book.networks[1].lockers.teamFin.toLowerCase(),
   book.networks[56].lockers.teamFin.toLowerCase(),
+];
+
+const BURNT_ADDRESSES = [
+  "0x000000000000000000000000000000000000dEaD".toLowerCase(),
 ];
 
 const addressesToMonitor = [...UNICRYPT_ADDRESSES];
@@ -183,6 +189,111 @@ class LockerBot {
     await this.checkContracts();
   }
 
+  checkLpSwaps(log, relChainId) {
+    let pairExists = false;
+    let pair;
+    for (const [key, value] of this.monitorPairs.entries()) {
+      if (value.pair.address.toLowerCase() === log.address.toLowerCase()) {
+        pairExists = true;
+        pair = value.pair;
+        break;
+      }
+    }
+    if (!pairExists) return;
+
+    try {
+      const decodedLog = this.web3[relChainId].eth.abi.decodeLog(
+        [
+          {
+            indexed: true,
+            name: "sender",
+            type: "address",
+          },
+          {
+            name: "amount0In",
+            type: "uint256",
+          },
+          {
+            name: "amount1In",
+            type: "uint256",
+          },
+          {
+            name: "amount0Out",
+            type: "uint256",
+          },
+          {
+            name: "amount1Out",
+            type: "uint256",
+          },
+          { indexed: true, name: "to", type: "address" },
+        ],
+        log.data,
+        log.topics
+      );
+
+      this._monitorCallback(pair);
+    } catch (err) {}
+  }
+
+  async checkErcTransfers(log, relChainId) {
+    const TransferEvent = [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "from",
+        type: "address",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "to",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "value",
+        type: "uint256",
+      },
+    ];
+
+    try {
+      const decodedLog = this.web3[relChainId].eth.abi.decodeLog(
+        TransferEvent,
+        log.data,
+        log.topics
+      );
+
+      if (
+        decodedLog.to &&
+        BURNT_ADDRESSES.includes(decodedLog.to.toLowerCase())
+      ) {
+        const lpTokenAddress = log.address;
+        const tokenContract = this._createERC20TokenContract(
+          lpTokenAddress,
+          relChainId
+        );
+
+        const getTotalSupply = tokenContract.methods.totalSupply();
+        const getBalOfBurnt = tokenContract.methods.balanceOf(decodedLog.to);
+
+        const totalSupply = await getTotalSupply.call();
+        const balOfBurnt = await getBalOfBurnt.call();
+
+        // Makes sure 100% of total supply is belongs to the burnt address
+        if (
+          new BigNumberJs(totalSupply.toString())
+            .minus(balOfBurnt.toString())
+            .dividedBy(totalSupply.toString())
+            .multipliedBy(100)
+            .lte("0.1")
+        ) {
+          this._checkLiquidityPool(lpTokenAddress, relChainId);
+        }
+      }
+    } catch (err) {}
+  }
+
   async checkContracts() {
     const activeWallets = await models.Wallet.findActiveWallets();
     console.log("Total activeWallets:", activeWallets.length);
@@ -261,7 +372,7 @@ class LockerBot {
                   }
                 );
 
-                // Monitors Swap events
+                // Monitors Swap & ERC20 Transfer events
                 this.web3[relChainId].eth.getTransactionReceipt(
                   txHash,
                   async (err, result) => {
@@ -269,56 +380,10 @@ class LockerBot {
                       return;
 
                     for (const log of result.logs) {
-                      let pairExists = false;
-                      let pair;
-                      for (const [key, value] of this.monitorPairs.entries()) {
-                        if (
-                          value.pair.address.toLowerCase() ===
-                          log.address.toLowerCase()
-                        ) {
-                          pairExists = true;
-                          pair = value.pair;
-                          break;
-                        }
-                      }
-                      if (!pairExists) continue;
+                      log.topics.shift();
 
-                      try {
-                        log.topics.shift();
-                        const decodedLog = this.web3[
-                          relChainId
-                        ].eth.abi.decodeLog(
-                          [
-                            {
-                              indexed: true,
-                              name: "sender",
-                              type: "address",
-                            },
-                            {
-                              name: "amount0In",
-                              type: "uint256",
-                            },
-                            {
-                              name: "amount1In",
-                              type: "uint256",
-                            },
-                            {
-                              name: "amount0Out",
-                              type: "uint256",
-                            },
-                            {
-                              name: "amount1Out",
-                              type: "uint256",
-                            },
-                            { indexed: true, name: "to", type: "address" },
-                          ],
-                          log.data,
-                          log.topics
-                        );
-
-                        this._monitorCallback(pair);
-                      } catch (err) {
-                      }
+                      this.checkLpSwaps(log, relChainId);
+                      this.checkErcTransfers(log, relChainId);
                     }
                   }
                 );
