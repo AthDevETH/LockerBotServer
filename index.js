@@ -4,7 +4,7 @@ require('express-async-errors');
 const cors = require('cors');
 const http = require('http');
 const apiRoutes = require('./routes');
-const lockerBot = require('./services/lockerBot2');
+const lockerBot = require('./services/lockerBot');
 const setupWebsocketServer = require('./services/websocket');
 const uncaughtException = require('./middleware/uncaughtException');
 
@@ -28,6 +28,7 @@ const main = async () => {
   setupMiddleware(app);
   setupWebsocketServer(server);
 
+  await lockerBot.initTelegramSession();
   await lockerBot.init();
 
   app.listen(process.env.PORT || 8080, async () => {

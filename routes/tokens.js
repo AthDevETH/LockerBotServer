@@ -66,7 +66,7 @@ router.post(
       token = await models.Token.createAndReturn(req.body);
 
       await events.publishSync(events.TRIGGER_APPROVE_EVENT, token);
-      return token;
+      return res.json(token);
     } catch (err) {
       if (err.name === errorTypes.TRANSACTION_ERROR) {
         if (token) {

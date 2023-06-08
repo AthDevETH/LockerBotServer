@@ -1,5 +1,3 @@
-// BSC
-
 const obj = {
   networks: {
     1: {
@@ -9,7 +7,7 @@ const obj = {
       },
       uniswap: {
         router: "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
-        factory: "",
+        factory: "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f",
       },
       tokens: {
         weth: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
@@ -25,7 +23,7 @@ const obj = {
       },
       uniswap: {
         router: "0x10ED43C718714eb63d5aA57B78B54704E256024E",
-        factory: "",
+        factory: "0xca143ce32fe78f1f7019d7d551a6402fc5350c73",
       },
       tokens: {
         weth: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", // WBNB

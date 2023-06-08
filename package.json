@@ -28,6 +28,7 @@
     "prettier": "^2.7.1",
     "sequelize": "^6.25.3",
     "sequelize-cli": "^6.5.2",
+    "telegram": "2.17.4",
     "uuid": "^9.0.0",
     "web3": "^1.8.0",
     "ws": "^8.10.0"

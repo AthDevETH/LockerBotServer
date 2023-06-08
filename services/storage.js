@@ -2,6 +2,7 @@ const { Sequelize } = require('sequelize');
 const initWalletModel = require('../models/Wallet');
 const initTokenModel = require('../models/Token');
 const initPairModel = require('../models/Pair');
+const initChannelsModel = require('../models/Channels');
 
 let sequelize;
 
@@ -28,6 +29,7 @@ if (process.env.JAWSDB_URL) {
 
 const Wallet = initWalletModel(sequelize);
 const Token = initTokenModel(sequelize, Wallet);
-initPairModel(sequelize, Token, Wallet);
+const Channels = initChannelsModel(sequelize, Wallet)
+initPairModel(sequelize, Token, Wallet, Channels);
 
 module.exports = sequelize;

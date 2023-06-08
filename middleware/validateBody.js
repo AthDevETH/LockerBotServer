@@ -17,3 +17,8 @@ module.exports.validateTokenBody = () => [
   body("monitorLength").isInt().optional({ nullable: true }),
   body("cyclesToTimeout").isInt().optional({ nullable: true }),
 ];
+
+module.exports.validateChannelsBody = () => [
+  body("name").isString(),
+  body("startTelegram").isBoolean().optional({ nullable: true }),
+];
