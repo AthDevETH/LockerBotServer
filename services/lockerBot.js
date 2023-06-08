@@ -61,7 +61,7 @@ class LockerBot {
             // will have to join the specific channels
 
             const apiId = Number(process.env.API_ID); // get this value from my.telegram.org/apps
-            const apiHash = process.env.API_ID; // get this value from my.telegram.org/apps
+            const apiHash = process.env.API_HASH; // get this value from my.telegram.org/apps
             const stringSession = new StringSession(process.env.SESSION); // fill this later with the value from session.save()
         
             this.client = new TelegramClient(stringSession, apiId, apiHash, {
