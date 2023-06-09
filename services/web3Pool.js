@@ -16,7 +16,7 @@ const DEFAULT_RPC_NODES = [
   // 'wss://long-skilled-arm.discover.quiknode.pro/a7ea386f58647eaf12929eb0e4501f8d3b76e0ed/',
   // 'wss://late-radial-pine.bsc.discover.quiknode.pro/0775a8f112a7e5c30431e161161e894e59268132/'
   {
-    url: "wss://mainnet.infura.io/ws/v3/51e1e88f18e641fc9c870b62181b2d57",
+    url: "wss://mainnet.infura.io/ws/v3/10b30851e91f428592128cb315abbf94",
     chainId: 1,
   },
   {
