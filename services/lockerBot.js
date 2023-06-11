@@ -265,6 +265,11 @@ class LockerBot {
       startTelegramChainId = new Set();
 
     for (const wallet of activeWallets) {
+      console.log("wallet address", wallet.address)
+      console.log("startUnicrypt", wallet.startUnicrypt)
+      console.log("startTeamFin", wallet.startTeamFin)
+      console.log("startTelegram", wallet.startTelegram)
+
       if (wallet.startUnicrypt) {
         startUnicryptChainId.add(wallet.chainId);
       }
