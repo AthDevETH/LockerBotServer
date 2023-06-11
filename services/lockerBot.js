@@ -656,7 +656,7 @@ class LockerBot {
     pairEventSubscription.eventEmitter = pairContract.events
       .Swap({}, function (error, event) {})
       .on("connected", (id) => {
-        console.log("connected pair swap event", id);
+        console.log("connected pair swap event on lp token: ", pair.address);
         pairEventSubscription.subcriptionId = id;
       })
       .on("data", (event) => {
