@@ -28,6 +28,8 @@ const { StringSession } = require("telegram/sessions");
 const { NewMessage } = require("telegram/events");
 
 class LockerBot {
+  sellingPairId = {};
+
   constructor() {
     this.web3 = {
       1: web3Pool.getNode(1),
@@ -265,11 +267,6 @@ class LockerBot {
       startTelegramChainId = new Set();
 
     for (const wallet of activeWallets) {
-      console.log("wallet address", wallet.address)
-      console.log("startUnicrypt", wallet.startUnicrypt)
-      console.log("startTeamFin", wallet.startTeamFin)
-      console.log("startTelegram", wallet.startTelegram)
-
       if (wallet.startUnicrypt) {
         startUnicryptChainId.add(wallet.chainId);
       }
@@ -731,14 +728,13 @@ class LockerBot {
         parseFloat(currentPrice) >=
         pair.Token.multiplierTarget * parseFloat(initialPrice)
       ) {
-        console.log("YES");
+        console.log("YES SELL");
         await this._sell(pair, chainId);
-        console.log("CLEARING 1");
-
         monitorInfo.eventEmitter.options.requestManager.removeSubscription(
           monitorInfo.subcriptionId
         );
         this.monitorPairs.delete(pair.id);
+        console.log("CLEARING 1");
       }
     } catch (err) {
       console.log(err);
@@ -748,6 +744,11 @@ class LockerBot {
   }
 
   async _sell(pair, chainId) {
+    if (sellingPairId[pair.id]) {
+      console.log("Already selling this pair");
+      return;
+    }
+    sellingPairId[pair.id] = true;
     console.log(`==========> SELL TX: ${pair.address} <==========`);
     const toSell = new BN(pair.tokensBought)
       .mul(new BN(pair.Token.percentToSell.toString()))
@@ -779,6 +780,8 @@ class LockerBot {
         : Web3.utils.fromWei(difference);
 
     profit = profit.toString();
+
+    sellingPairId[pair.id] = false;
     return models.Pair.update(
       {
         amountSold: toSell.toString(),
