@@ -744,11 +744,11 @@ class LockerBot {
   }
 
   async _sell(pair, chainId) {
-    if (sellingPairId[pair.id]) {
+    if (this.sellingPairId[pair.id]) {
       console.log("Already selling this pair");
       return;
     }
-    sellingPairId[pair.id] = true;
+    this.sellingPairId[pair.id] = true;
     console.log(`==========> SELL TX: ${pair.address} <==========`);
     const toSell = new BN(pair.tokensBought)
       .mul(new BN(pair.Token.percentToSell.toString()))
@@ -781,7 +781,7 @@ class LockerBot {
 
     profit = profit.toString();
 
-    sellingPairId[pair.id] = false;
+    this.sellingPairId[pair.id] = false;
     return models.Pair.update(
       {
         amountSold: toSell.toString(),
