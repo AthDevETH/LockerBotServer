@@ -73,6 +73,15 @@ class Web3Pool {
 
     return pool.web3;
   }
+
+  getMevProtectectionWeb3() {
+    return {
+      1: new Web3(
+        new Web3.providers.HttpProvider("https://rpc.mevblocker.io")
+      ),
+      56: null,
+    };
+  }
 }
 
 module.exports = new Web3Pool();

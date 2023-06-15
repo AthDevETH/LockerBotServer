@@ -35,6 +35,7 @@ class LockerBot {
       1: web3Pool.getNode(1),
       56: web3Pool.getNode(56),
     };
+    this.mevWeb3 = web3Pool.getMevProtectectionWeb3();
     this.unicryptContract = {};
     this.teamFinanceContract = {};
     this.telegramContract = {};
@@ -93,7 +94,7 @@ class LockerBot {
     // await this.initTelegram();
 
     this.routerContract = {
-      1: new this.web3[1].eth.Contract(
+      1: new this.mevWeb3[1].eth.Contract(
         routerABI,
         book.networks[1].uniswap.router
       ),
