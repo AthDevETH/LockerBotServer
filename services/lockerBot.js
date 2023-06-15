@@ -875,7 +875,7 @@ class LockerBot {
     );
 
     const base = await this.web3[chainId].eth.getGasPrice();
-    const gas = new BN(base.toString()).add(new BN("4000000000"));
+    const gas = new BN(base.toString()).mul(15).div(10);
     const baseGasLimit = await transaction.estimateGas({ from: address });
     const gasLimit = parseInt(baseGasLimit.toString());
     const gasLimitBuffer = parseInt(gasLimit * 0.5);
@@ -907,7 +907,7 @@ class LockerBot {
       currentTime + 300
     );
     const base = await this.web3[chainId].eth.getGasPrice();
-    const gas = new BN(base.toString()).add(new BN("4000000000"));
+    const gas = new BN(base.toString()).mul(15).div(10);
     const baseGasLimit = await transaction.estimateGas({ from: address });
     const gasLimit = parseInt(baseGasLimit.toString());
     const gasLimitBuffer = parseInt(gasLimit * 0.5);
