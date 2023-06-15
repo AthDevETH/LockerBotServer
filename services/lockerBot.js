@@ -832,20 +832,43 @@ class LockerBot {
       }
     }
 
+    const minOutAmounts = await this.routerContract[
+      chainId
+    ].methods.getAmountsOut(toSwap.toString(), path);
+
+    const minOutAmount = this.web3[chainId].utils
+      .BN(minOutAmounts[minOutAmounts.length - 1].toString())
+      .div(10)
+      .toString();
+
     try {
-      return await this._swap_(toSwap, path, address, privateKey, chainId);
+      return await this._swap_(
+        toSwap,
+        path,
+        address,
+        privateKey,
+        minOutAmount,
+        chainId
+      );
     } catch {
-      return await this._swap2_(toSwap, path, address, privateKey, chainId);
+      return await this._swap2_(
+        toSwap,
+        path,
+        address,
+        privateKey,
+        minOutAmount,
+        chainId
+      );
     }
   }
 
-  async _swap_(toSwap, path, address, privateKey, chainId) {
+  async _swap_(toSwap, path, address, privateKey, minOutAmount, chainId) {
     const currentTime = Math.round(Date.now() / 1000);
     const transaction = this.routerContract[
       chainId
     ].methods.swapExactTokensForTokens(
       toSwap.toString(),
-      "0",
+      minOutAmount,
       path,
       address,
       currentTime + 300
@@ -872,13 +895,13 @@ class LockerBot {
     );
   }
 
-  async _swap2_(toSwap, path, address, privateKey, chainId) {
+  async _swap2_(toSwap, path, address, privateKey, minOutAmount, chainId) {
     const currentTime = Math.round(Date.now() / 1000);
     const transaction = this.routerContract[
       chainId
     ].methods.swapExactTokensForTokensSupportingFeeOnTransferTokens(
       toSwap.toString(),
-      "0",
+      minOutAmount,
       path,
       address,
       currentTime + 300
