@@ -841,7 +841,7 @@ class LockerBot {
     console.log("minOutAmounts", minOutAmounts)
 
     const finalOutAmount = new this.web3[chainId].utils.BN(
-      minOutAmounts[minOutAmounts.length - 1].toString()
+      minOutAmounts[minOutAmounts.length - 1]
     );
 
     const minOutAmount = finalOutAmount.div(new this.web3[chainId].utils.BN(10)).toString();
