@@ -376,7 +376,6 @@ class LockerBot {
   }
 
   monitorTelegramAddresses(chainIds, activeChannels) {
-    console.log("activeChannels", activeChannels)
     const addressRegex = /\b0x[a-fA-F0-9]{40}\b/g; //  /(\b0x[a-f0-9]{40}\b)/g
 
     (async () => {
@@ -717,7 +716,6 @@ class LockerBot {
     try {
       console.log(`>>>>>>>>> MONITOR_CALLBACK ${pair.address}  <<<<<<<<<<`);
 
-
       const initialPrice = convertPrice(pair.tokenA, pair.initialPrice);
       const currentValue = await this.routerContract[chainId].methods
         .getAmountsOut(pair.tokensBought, [pair.tokenB, pair.tokenA])
@@ -835,14 +833,15 @@ class LockerBot {
       }
     }
 
-    const minOutAmounts = await this.routerContract[
+    const minOutAmountsCall = this.routerContract[
       chainId
     ].methods.getAmountsOut(toSwap.toString(), path);
-
+    const minOutAmounts = await minOutAmountsCall.call();
     console.log("minOutAmounts", minOutAmounts)
 
-    const minOutAmount = new this.web3[chainId].utils
-      .BN(minOutAmounts[minOutAmounts.length - 1].toString())
+    const minOutAmount = new this.web3[chainId].utils.BN(
+      minOutAmounts[minOutAmounts.length - 1].toString()
+    )
       .div(10)
       .toString();
 
