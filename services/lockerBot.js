@@ -376,6 +376,7 @@ class LockerBot {
   }
 
   monitorTelegramAddresses(chainIds, activeChannels) {
+    console.log("activeChannels", activeChannels)
     const addressRegex = /\b0x[a-fA-F0-9]{40}\b/g; //  /(\b0x[a-f0-9]{40}\b)/g
 
     (async () => {
@@ -715,6 +716,7 @@ class LockerBot {
 
     try {
       console.log(`>>>>>>>>> MONITOR_CALLBACK ${pair.address}  <<<<<<<<<<`);
+
 
       const initialPrice = convertPrice(pair.tokenA, pair.initialPrice);
       const currentValue = await this.routerContract[chainId].methods
