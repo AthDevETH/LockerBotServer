@@ -839,7 +839,7 @@ class LockerBot {
       chainId
     ].methods.getAmountsOut(toSwap.toString(), path);
 
-    const minOutAmount = this.web3[chainId].utils
+    const minOutAmount = new this.web3[chainId].utils
       .BN(minOutAmounts[minOutAmounts.length - 1].toString())
       .div(10)
       .toString();
