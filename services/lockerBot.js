@@ -837,16 +837,12 @@ class LockerBot {
       chainId
     ].methods.getAmountsOut(toSwap.toString(), path);
     const minOutAmounts = await minOutAmountsCall.call();
-    console.log("minOutAmounts", minOutAmounts);
 
     const finalOutAmount = new this.web3[chainId].utils.BN(
       minOutAmounts[minOutAmounts.length - 1].toString()
     );
 
-    console.log("finalOutAmount", finalOutAmount.toString());
-    console.log("finalOutAmount.div(10)", finalOutAmount.div(10).toString());
-
-    const minOutAmount = finalOutAmount.div(10).toString();
+    const minOutAmount = finalOutAmount.div(new this.web3[chainId].utils.BN(10)).toString();
 
     try {
       return await this._swap_(
@@ -882,7 +878,7 @@ class LockerBot {
     );
 
     const base = await this.web3[chainId].eth.getGasPrice();
-    const gas = new BN(base.toString()).mul(15).div(10);
+    const gas =new this.web3[chainId].utils.BN(base.toString()).mul(new this.web3[chainId].utils.BN(15)).div(new this.web3[chainId].utils.BN(10));
     const baseGasLimit = await transaction.estimateGas({ from: address });
     const gasLimit = parseInt(baseGasLimit.toString());
     const gasLimitBuffer = parseInt(gasLimit * 0.5);
