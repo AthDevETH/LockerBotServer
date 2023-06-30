@@ -460,8 +460,10 @@ class LockerBot {
       } catch (e) {
         console.log("Error: ", e.message);
       }
+
+      console.log("finalChannels", finalChannels);
+
     })();
-    console.log("finalChannels", finalChannels);
   }
 
   async _checkLiquidityPool(pairAddress, chainId, text) {
