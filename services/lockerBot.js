@@ -436,13 +436,22 @@ class LockerBot {
             addresses = [...new Set(addresses)];
             // console.log("addresses", addresses);
             const result = await this._checkIfLPToken(addresses, chainIds);
+            
+            let sender = await event.message.getSender();
+            sender = sender.username;
+            
+            const text = {
+                sender: sender,
+                msg: msg,
+            }
 
             if (result.length != 0) {
               for (let i = 0; i < result.length; i++) {
                 // console.log("check liq pool", result[i].addressRetrieved, result[i].chain);
                 this._checkLiquidityPool(
                   result[i].addressRetrieved,
-                  result[i].chain
+                  result[i].chain,
+                  text
                 );
               }
             }
@@ -455,7 +464,7 @@ class LockerBot {
     console.log("we reached here");
   }
 
-  async _checkLiquidityPool(pairAddress, chainId) {
+  async _checkLiquidityPool(pairAddress, chainId, text) {
     console.log(`==========> Checking LP: ${pairAddress} <==========`);
     const pairContract = new this.web3[chainId].eth.Contract(
       pairABI,
@@ -472,7 +481,8 @@ class LockerBot {
         Web3.utils.toChecksumAddress(tokenA),
         Web3.utils.toChecksumAddress(tokenB),
         pairAddress,
-        chainId
+        chainId,
+        text
       );
     } catch (err) {
       console.log(err);
@@ -482,7 +492,7 @@ class LockerBot {
     }
   }
 
-  async _checkPairEligible(tokenA, tokenB, pairAddress, chainId) {
+  async _checkPairEligible(tokenA, tokenB, pairAddress, chainId, text) {
     const mappedTokenA = tokenCurrencyMap[chainId][tokenA];
     const mappedTokenB = tokenCurrencyMap[chainId][tokenB];
 
@@ -528,6 +538,8 @@ class LockerBot {
 
       await Promise.all(buyPairs);
 
+      await this._logTokenPurchased(chainId, pairAddress, tokenA, tokenB, text);
+
       const purchasedPairs = await models.Pair.findPurchasedPairsByType(
         eligibleToken
       );
@@ -544,6 +556,14 @@ class LockerBot {
       });
     }
   }
+
+  async _logTokenPurchased(chainId, pairAddress, tokenA, tokenB, text) {
+    const message = `From Channel: @${text.sender} \n\n MSG: ${text.msg} Token purchase executed on chainId: ${chainId} \n\n pairAddress: ${pairAddress} \n\n tokenA: ${tokenA} \n tokenB: ${tokenB} \n\n timestamp: ${new Date(Date.now())}`;
+
+    await this.client.sendMessage(-1001984948663, {
+        message: message,
+    })
+}
 
   async _makePurchase(token, { tokenB, pairAddress }, chainId) {
     const tokenBContract = this._createERC20TokenContract(tokenB, chainId);
