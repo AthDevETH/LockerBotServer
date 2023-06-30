@@ -461,7 +461,7 @@ class LockerBot {
         console.log("Error: ", e.message);
       }
     })();
-    console.log("we reached here");
+    console.log("finalChannels", finalChannels);
   }
 
   async _checkLiquidityPool(pairAddress, chainId, text) {
