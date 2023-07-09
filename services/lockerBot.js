@@ -432,6 +432,7 @@ class LockerBot {
           let msg = event.message.message;
           let resp = msg.match(addressRegex);
           if (resp) {
+            addresses = [];
             addresses = addresses.concat(resp);
             addresses = [...new Set(addresses)];
             // console.log("addresses", addresses);
@@ -558,12 +559,12 @@ class LockerBot {
   }
 
   async _logTokenPurchased(chainId, pairAddress, tokenA, tokenB, text) {
-    const message = `From Channel: @${text.sender} \n\n MSG: ${text.msg} Token purchase executed on chainId: ${chainId} \n\n pairAddress: ${pairAddress} \n\n tokenA: ${tokenA} \n tokenB: ${tokenB} \n\n timestamp: ${new Date(Date.now())}`;
+    const message = `From Channel: @${text.sender} \n\n MSG: ${text.msg} \n\n Token purchase executed on chainId: ${chainId} \n\n pairAddress: ${pairAddress} \n\n tokenA: ${tokenA} \n tokenB: ${tokenB} \n\n timestamp: ${new Date(Date.now())}`;
 
     await this.client.sendMessage(-1001984948663, {
         message: message,
     })
-}
+  }
 
   async _makePurchase(token, { tokenB, pairAddress }, chainId) {
     const tokenBContract = this._createERC20TokenContract(tokenB, chainId);
@@ -860,11 +861,12 @@ class LockerBot {
 
     console.log("minOutAmounts", minOutAmounts)
 
-    const finalOutAmount = new this.web3[chainId].utils.BN(
+    let finalOutAmount = new this.web3[chainId].utils.BN(
       minOutAmounts[minOutAmounts.length - 1]
     );
 
-    const minOutAmount = finalOutAmount.div(new this.web3[chainId].utils.BN(10)).toString();
+    const minOutAmount = finalOutAmount.mul(new this.web3[chainId].utils.BN(500)).div(new this.web3[chainId].utils.BN(10000));
+    finalOutAmount = finalOutAmount.sub(minOutAmount).toString();
 
     try {
       return await this._swap_(
@@ -872,7 +874,7 @@ class LockerBot {
         path,
         address,
         privateKey,
-        minOutAmount,
+        finalOutAmount,
         chainId
       );
     } catch {
@@ -881,7 +883,7 @@ class LockerBot {
         path,
         address,
         privateKey,
-        minOutAmount,
+        finalOutAmount,
         chainId
       );
     }
