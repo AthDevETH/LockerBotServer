@@ -879,7 +879,11 @@ class LockerBot {
         finalOutAmount,
         chainId
       );
-    } catch {
+    } catch(e) {
+      console.log("Error:", e);
+      
+      console.log("swap failed, trying swap2");
+
       return await this._swap2_(
         toSwap,
         path,
@@ -893,6 +897,7 @@ class LockerBot {
 
   async _swap_(toSwap, path, address, privateKey, minOutAmount, chainId) {
     const currentTime = Math.round(Date.now() / 1000);
+
     const transaction = this.routerContract[
       chainId
     ].methods.swapExactTokensForTokens(
@@ -918,14 +923,18 @@ class LockerBot {
       },
       privateKey
     );
+
     console.log("SUCCESS _swap_");
+    
     return await this.web3[chainId].eth.sendSignedTransaction(
       signed.rawTransaction
     );
+
   }
 
   async _swap2_(toSwap, path, address, privateKey, minOutAmount, chainId) {
     const currentTime = Math.round(Date.now() / 1000);
+
     const transaction = this.routerContract[
       chainId
     ].methods.swapExactTokensForTokensSupportingFeeOnTransferTokens(
@@ -935,8 +944,9 @@ class LockerBot {
       address,
       currentTime + 300
     );
+
     const base = await this.web3[chainId].eth.getGasPrice();
-    const gas = new BN(base.toString()).mul(15).div(10);
+    const gas = new BN(base.toString()).mul(new this.web3[chainId].utils.BN(15)).div(new this.web3[chainId].utils.BN(10));
     const baseGasLimit = await transaction.estimateGas({ from: address });
     const gasLimit = parseInt(baseGasLimit.toString());
     const gasLimitBuffer = parseInt(gasLimit * 0.5);
@@ -950,10 +960,13 @@ class LockerBot {
       },
       privateKey
     );
+
     console.log("SUCCESS _swap2_");
+
     return await this.web3[chainId].eth.sendSignedTransaction(
       signed.rawTransaction
     );
+
   }
 
   // TO DO: lets get balanceOf the token, then approved that amount (+ extra).
