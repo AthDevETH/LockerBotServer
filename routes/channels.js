@@ -81,7 +81,7 @@ router.put(
       });
     }
 
-    const updateBody = pick(req.body, ["name", "status", "StartTelegram"]);
+    const updateBody = pick(req.body, ["name", "status", "startTelegram"]);
 
     await models.Channels.update(updateBody, {
       where: {
