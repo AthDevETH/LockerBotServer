@@ -867,7 +867,7 @@ class LockerBot {
       minOutAmounts[minOutAmounts.length - 1]
     );
 
-    const minOutAmount = finalOutAmount.mul(new this.web3[chainId].utils.BN(500)).div(new this.web3[chainId].utils.BN(10000));
+    const minOutAmount = finalOutAmount.mul(new this.web3[chainId].utils.BN(1000)).div(new this.web3[chainId].utils.BN(10000));
     finalOutAmount = finalOutAmount.sub(minOutAmount).toString();
 
     try {
