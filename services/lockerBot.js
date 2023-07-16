@@ -598,17 +598,21 @@ class LockerBot {
         return console.log("==========> No new tokens found <==========");
       }
 
+      const msgInfo = {
+        tokenA: tokenA,
+        text: text,
+      };
+
       const buyPairs = newTokens.map((token) =>
         this._makePurchase(
           token,
           { tokenB: counterToken, pairAddress },
-          chainId
+          chainId,
+          msgInfo
         )
       );
 
       await Promise.all(buyPairs);
-
-      await this._logTokenPurchased(chainId, pairAddress, tokenA, tokenB, text);
 
       const purchasedPairs = await models.Pair.findPurchasedPairsByType(
         eligibleToken
@@ -627,15 +631,23 @@ class LockerBot {
     }
   }
 
-  async _logTokenPurchased(chainId, pairAddress, tokenA, tokenB, text) {
-    const message = `From Channel: @${text.sender} \n\n MSG: ${text.msg} \n\n Token purchase executed on chainId: ${chainId} \n\n pairAddress: ${pairAddress} \n\n tokenA: ${tokenA} \n tokenB: ${tokenB} \n\n timestamp: ${new Date(Date.now())}`;
+  async _logTokenPurchased(chainId, pairAddress, tokenA, tokenB, text, swapTx) {
+    const message = `From Channel: @${text.sender} \n\n MSG: ${text.msg} \n\n Token purchase executed on chainId: ${chainId} \n\n pairAddress: https://etherscan.io/address/${pairAddress} \n\n tokenA: https://etherscan.io/address/${tokenA} \n tokenB: https://etherscan.io/address/${tokenB} \n\n Swap Transaction Hash: https://etherscan.io/tx/${swapTx} \n\n Timestamp: ${new Date(Date.now())}`;
 
     await this.client.sendMessage(-1001984948663, {
-        message: message,
+      message: message,
     })
   }
 
-  async _makePurchase(token, { tokenB, pairAddress }, chainId) {
+  async _logTokenPurchaseFailed(info){
+    const message = `Token Purchase Failed \n\n From Channel: @${info.channel}  \n\n ERROR: ${info.error} \n\n Wallet Address: https://etherscan.io/address/${info.walletAddress} \n\n Token Purchasing: https://etherscan.io/address/${info.tokenB} \n\n Pair Address: https://etherscan.io/address/${info.pairAddress} \n\n ChainID: ${info.chainId} \n\n Timestamp: ${new Date(Date.now())}`;
+    
+    await this.client.sendMessage(-1001984948663, {
+      message: message,
+    })
+  }
+
+  async _makePurchase(token, { tokenB, pairAddress }, chainId, msgInfo) {
     const tokenBContract = this._createERC20TokenContract(tokenB, chainId);
     let swapTx;
     let pair;
@@ -655,10 +667,24 @@ class LockerBot {
         ).toString(),
         tx: swapTx.transactionHash,
       });
+
+      await this._logTokenPurchased(chainId, pairAddress, msgInfo.tokenA, tokenB, msgInfo.text, swapTx.transactionHash);
+
     } catch (error) {
       // if swap fails, we should NOT try to buy again (because prices may drop)
       // cancel this operation and do NOT create pair
       console.log(`purchase failed from: ${token.Wallet.address}`);
+
+      const info = {
+        channel: msgInfo.text.sender,
+        walletAddress: token.Wallet.address,
+        tokenB: tokenB,
+        pairAddress: pairAddress,
+        chainId: chainId,
+        error: error.message,
+      }
+
+      await this._logTokenPurchaseFailed(info);
       console.log(error);
       return;
     }
@@ -834,6 +860,22 @@ class LockerBot {
     monitorInfo.insideMonitoringCallback = false;
   }
 
+  async _logTokenSold(sellInfo){
+    const message = `Token Sold Successfully \n\n Token PairSold: https://etherscan.io/address/${sellInfo.pairAddress} \n\n TokenA: https://etherscan.io/address/${sellInfo.tokenA} \n TokenB: https://etherscan.io/address/${sellInfo.tokenB} \n\n Swap TX: https://etherscan.io/tx/${sellInfo.swapTx} \n\n Timestamp: ${new Date(Date.now())}`;
+  
+    await this.client.sendMessage(-945055987, {
+      message: message,
+    })
+  }
+
+  async _logTokenSellFailed(sellInfo){
+    const message = `Token Sell Failed \n\n Error: ${sellInfo.error} \n\n Token Pair: https://etherscan.io/address/${sellInfo.pairAddress} \n\n TokenA: https://etherscan.io/address/${sellInfo.tokenA} \n TokenB: https://etherscan.io/address/${sellInfo.tokenB} \n\n Timestamp: ${new Date(Date.now())}`;
+  
+    await this.client.sendMessage(-945055987, {
+      message: message,
+    })
+  }
+
   async _sell(pair, chainId) {
     if (this.sellingPairId[pair.id]) {
       console.log("Already selling this pair");
@@ -853,11 +895,33 @@ class LockerBot {
     );
     const balanceBefore = await getBalance.call();
 
-    const swapTx = await this._swap(
-      pair.Token,
-      [pair.tokenB, pair.tokenA],
-      false
-    );
+    let swapTx;
+    try {
+      swapTx = await this._swap(
+        pair.Token,
+        [pair.tokenB, pair.tokenA],
+        false
+      );
+
+      await this._logTokenSold({
+        pairAddress: pair.address,
+        tokenA: pair.tokenA,
+        tokenB: pair.tokenB,
+        swapTx: swapTx.transactionHash,
+      });
+
+    } catch (e) {
+      console.log("Error:", e);
+
+      await this._logTokenSellFailed({
+        pairAddress: pair.address,
+        tokenA: pair.tokenA,
+        tokenB: pair.tokenB,
+        error: e.message,
+      });
+
+    }
+    
 
     const balanceAfter = await getBalance.call();
     // to get profit, we will compare balance before with balance after
