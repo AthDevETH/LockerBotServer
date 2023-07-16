@@ -54,6 +54,8 @@ class LockerBot {
       1: null,
       56: null,
     };
+    this.eventHandlerIdentifier = 'channelMonitoring'
+    this.eventHandlerObject = {};
   }
 
   async initTelegramSession() {
@@ -122,7 +124,22 @@ class LockerBot {
 
     this.events.subscribe(
       this.events.TRIGGER_CHANNEL_EVENT,
-      this.telegramTrackingSetup.bind(this)
+      async () => {
+        console.log("TRIGGER_CHANNEL_EVENT_PROCESSING");
+        // RESTARTS TELEGRAM MONITORING
+        const allChannels = await models.Channels.findActiveChannels();
+        const activeChannels = await this.getActiveChannels();
+        const finalChannels = await this.getFinalChannels(activeChannels);
+        const chainIds = await this.getChainIds(allChannels);
+
+        await this.telegramRemoveEventHandlers();
+
+        if(finalChannels.length > 0){
+          await this.telegramAddEventHandlers(chainIds, finalChannels);
+        }
+        await this.telegramEventHandlers();
+      }
+      // this.telegramTrackingSetup.bind(this)
     );
 
     this.events.subscribe(
@@ -234,29 +251,163 @@ class LockerBot {
     await this.checkContracts();
   }
 
-  async telegramTrackingSetup() {
-    console.log("INSIDE TRACKING");
-    const activeChannels = await models.Channels.findActiveChannels();
+  async telegramEventHandlers() {
+    const events = this.client.listEventHandlers();
+    console.log("events: ", events);
+  }
 
-    let activeChannelsList = [];
+  async telegramRemoveEventHandlers() {
+    try {
+      const eventHandler = this.eventHandlerObject;
+      this.client.removeEventHandler(
+        eventHandler
+      );
+    } catch (e) {
+      console.log("Error: ", e.message);
+    }
+  }
 
-    for (let i = 0; i < activeChannels.length; i++) {
+  async telegramAddEventHandlers(chainIds, finalChannels) {
+    try {
+      const eventHandler = async (events) => {
+        this.msgAddressMonitor(events, chainIds)
+      }
+      this.eventHandlerObject = eventHandler;
+      this.client.addEventHandler(
+        eventHandler, 
+        new NewMessage({ chats: finalChannels },
+        this.eventHandlerIdentifier    
+      )
+      );
+    } catch (e) {
+      console.log("Error: ", e.message);
+    }
+  }
+
+  async msgAddressMonitor(event, chainIds){
+    const addressRegex = /\b0x[a-fA-F0-9]{40}\b/g;
+    let addresses = [];
+
+    const allChannels = await models.Channels.findActiveChannels();
+    const chainIds2 = await this.getChainIds(allChannels);
+
+
+    let msg = event.message.message;
+    console.log("msg: ", msg);
+    
+    let resp = msg.match(addressRegex);
+    if (resp) {
+      addresses = [];
+      addresses = addresses.concat(resp);
+      addresses = [...new Set(addresses)];
+      const result = await this._checkIfLPToken(addresses, chainIds2);
+      
+      let sender = await event.message.getSender();
+      sender = sender.username;
+      
+      const text = {
+          sender: sender,
+          msg: msg,
+      }
+
+      if (result.length != 0) {
+        for (let i = 0; i < result.length; i++) {
+          this._checkLiquidityPool(
+            result[i].addressRetrieved,
+            result[i].chain,
+            text
+          );
+        }
+      }
+    }
+  }
+
+  async getFinalChannels(activeChannels) {
+    let finalChannels = [];
+
+    for (const channels of activeChannels) {
+      let error = false;
+      try {
+        const exists = await this.client.invoke(
+          new Api.channels.GetChannels({
+            id: ["@" + channels],
+          })
+        );
+      } catch (e) {
+        console.log("Error: ", e.message);
+        error = true;
+      }
+
+      if (error === true) continue;
+
+      try {
+        await this.client.invoke(
+          new Api.channels.GetParticipant({
+            channel: "@" + channels,
+            participant: "@unipcstgbot",
+          })
+        );
+      } catch (e) {
+        console.log("Error: ", e);
+
+        if (
+          e.message ==
+          "400: USER_NOT_PARTICIPANT (caused by channels.GetParticipant)"
+        ) {
+          console.log("Adding User to Channel");
+          try {
+            await this.client.invoke(
+              new Api.channels.JoinChannel({
+                channel: "@" + channels,
+              })
+            );
+          } catch (e) {
+            console.log("Error: ", e.message);
+          }
+        }
+      }
+      finalChannels.push("@" + channels);
+    }
+
+    return finalChannels;
+  }
+
+  async getActiveChannels() {
+    const allChannels = await models.Channels.findActiveChannels();
+    let activeChannels = [];
+
+    for (let i = 0; i < allChannels.length; i++) {
       // Status = Active && Closed
-      if (activeChannels[i].status == "Active") {
-        activeChannelsList.push(activeChannels[i].name);
+      if (allChannels[i].status == "Active") {
+        activeChannels.push(allChannels[i].name);
       }
     }
 
+    return activeChannels;
+  }
+
+  async getChainIds(allChannels) {
     let startTelegramChainId = [];
 
-    for (const channel of activeChannels) {
+    for (const channel of allChannels) {
       if (channel.startTelegram) {
         startTelegramChainId.push(channel.Wallet.chainId); // create table for telegram
       }
     }
-    console.log("startTelegram", startTelegramChainId.length != 0);
 
-    this.monitorTelegramAddresses(startTelegramChainId, activeChannelsList);
+    return startTelegramChainId;
+  }
+
+  async telegramTrackingSetup() {
+    const allChannels = await models.Channels.findActiveChannels();
+
+    let activeChannelsList = await this.getActiveChannels();
+    let startTelegramChainId = await this.getChainIds(allChannels);
+
+    if(activeChannelsList.length > 0){
+      await this.monitorTelegramAddresses(startTelegramChainId, activeChannelsList);
+      // await this.telegramEventHandlers();
+    }
   }
 
   async checkContracts() {
@@ -375,96 +526,12 @@ class LockerBot {
     }
   }
 
-  monitorTelegramAddresses(chainIds, activeChannels) {
-    const addressRegex = /\b0x[a-fA-F0-9]{40}\b/g; //  /(\b0x[a-f0-9]{40}\b)/g
+  async monitorTelegramAddresses(chainIds, activeChannels) {
+    let finalChannels = await this.getFinalChannels(activeChannels);
 
-    (async () => {
-      let addresses = [];
-      let finalChannels = [];
+    await this.telegramAddEventHandlers(chainIds, finalChannels);
 
-      for (const channels of activeChannels) {
-        let error = false;
-        try {
-          const exists = await this.client.invoke(
-            new Api.channels.GetChannels({
-              id: ["@" + channels],
-            })
-          );
-        } catch (e) {
-          console.log("Error: ", e.message);
-          error = true;
-        }
-
-        if (error === true) continue;
-
-        try {
-          await this.client.invoke(
-            new Api.channels.GetParticipant({
-              channel: "@" + channels,
-              participant: "@unipcstgbot",
-            })
-          );
-        } catch (e) {
-          console.log("Error: ", e);
-
-          if (
-            e.message ==
-            "400: USER_NOT_PARTICIPANT (caused by channels.GetParticipant)"
-          ) {
-            console.log("Adding User to Channel");
-            try {
-              await this.client.invoke(
-                new Api.channels.JoinChannel({
-                  channel: "@" + channels,
-                })
-              );
-            } catch (e) {
-              console.log("Error 123: ", e.message);
-            }
-          }
-        }
-        finalChannels.push("@" + channels);
-      }
-
-      try {
-        this.client.addEventHandler(async (event) => {
-          // console.log("event", event.message);
-          let msg = event.message.message;
-          let resp = msg.match(addressRegex);
-          if (resp) {
-            addresses = [];
-            addresses = addresses.concat(resp);
-            addresses = [...new Set(addresses)];
-            // console.log("addresses", addresses);
-            const result = await this._checkIfLPToken(addresses, chainIds);
-            
-            let sender = await event.message.getSender();
-            sender = sender.username;
-            
-            const text = {
-                sender: sender,
-                msg: msg,
-            }
-
-            if (result.length != 0) {
-              for (let i = 0; i < result.length; i++) {
-                // console.log("check liq pool", result[i].addressRetrieved, result[i].chain);
-                this._checkLiquidityPool(
-                  result[i].addressRetrieved,
-                  result[i].chain,
-                  text
-                );
-              }
-            }
-          }
-        }, new NewMessage({ chats: finalChannels }));
-      } catch (e) {
-        console.log("Error: ", e.message);
-      }
-
-      console.log("finalChannels", finalChannels);
-
-    })();
+    console.log("finalChannels", finalChannels);
   }
 
   async _checkLiquidityPool(pairAddress, chainId, text) {
