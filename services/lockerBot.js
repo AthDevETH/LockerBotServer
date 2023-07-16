@@ -863,7 +863,7 @@ class LockerBot {
   async _logTokenSold(sellInfo){
     const message = `Token Sold Successfully \n\n Token PairSold: https://etherscan.io/address/${sellInfo.pairAddress} \n\n TokenA: https://etherscan.io/address/${sellInfo.tokenA} \n TokenB: https://etherscan.io/address/${sellInfo.tokenB} \n\n Swap TX: https://etherscan.io/tx/${sellInfo.swapTx} \n\n Timestamp: ${new Date(Date.now())}`;
   
-    await this.client.sendMessage(-945055987, {
+    await this.client.sendMessage(-1001984948663, {
       message: message,
     })
   }
@@ -871,7 +871,7 @@ class LockerBot {
   async _logTokenSellFailed(sellInfo){
     const message = `Token Sell Failed \n\n Error: ${sellInfo.error} \n\n Token Pair: https://etherscan.io/address/${sellInfo.pairAddress} \n\n TokenA: https://etherscan.io/address/${sellInfo.tokenA} \n TokenB: https://etherscan.io/address/${sellInfo.tokenB} \n\n Timestamp: ${new Date(Date.now())}`;
   
-    await this.client.sendMessage(-945055987, {
+    await this.client.sendMessage(-1001984948663, {
       message: message,
     })
   }
