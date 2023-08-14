@@ -56,6 +56,7 @@ class LockerBot {
     };
     this.eventHandlerIdentifier = 'channelMonitoring'
     this.eventHandlerObject = {};
+    this.slippageValue = 1000; // Default slippage amount 1000 = 10%
   }
 
   async initTelegramSession() {
@@ -245,6 +246,13 @@ class LockerBot {
       }
       return true;
     });
+
+    this.events.subscribe(
+      this.events.TRIGGER_SLIPPAGE_EVENT,
+      async (slippage) => {
+        console.log("TRIGGER_SLIPPAGE_EVENT_PROCESSING");
+      }
+    )
   }
 
   async initContracts() {
@@ -998,7 +1006,21 @@ class LockerBot {
       minOutAmounts[minOutAmounts.length - 1]
     );
 
-    const minOutAmount = finalOutAmount.mul(new this.web3[chainId].utils.BN(1000)).div(new this.web3[chainId].utils.BN(10000));
+    const wallets = await models.Wallet.findActiveWallets();
+    const matchedWallet = wallets.find((wallet) => wallet.address === address);
+
+    const details = await models.Slippages.findSlippageByWallet(matchedWallet.id);
+    const matchedDetails = details.find((details) => details.walletId === matchedWallet.id);
+
+    let slippage;
+
+    if(matchedDetails.slippage == 0 || matchedDetails.slippage == null || matchedDetails.slippage == undefined){
+      slippage = this.slippage;
+    } else {
+      slippage = matchedDetails.slippage;
+    }
+
+    const minOutAmount = finalOutAmount.mul(new this.web3[chainId].utils.BN(slippage)).div(new this.web3[chainId].utils.BN(10000));
     finalOutAmount = finalOutAmount.sub(minOutAmount).toString();
 
     try {

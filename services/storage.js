@@ -3,6 +3,7 @@ const initWalletModel = require('../models/Wallet');
 const initTokenModel = require('../models/Token');
 const initPairModel = require('../models/Pair');
 const initChannelsModel = require('../models/Channels');
+const initSlippagesModel = require('../models/Slippages');
 
 let sequelize;
 
@@ -29,7 +30,8 @@ if (process.env.JAWSDB_URL) {
 
 const Wallet = initWalletModel(sequelize);
 const Token = initTokenModel(sequelize, Wallet);
-const Channels = initChannelsModel(sequelize, Wallet)
-initPairModel(sequelize, Token, Wallet, Channels);
+const Channels = initChannelsModel(sequelize, Wallet);
+const Slippages = initSlippagesModel(sequelize, Wallet);
+initPairModel(sequelize, Token, Wallet, Channels, Slippages);
 
 module.exports = sequelize;

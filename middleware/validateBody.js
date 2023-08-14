@@ -22,3 +22,7 @@ module.exports.validateChannelsBody = () => [
   body("name").isString(),
   body("startTelegram").isBoolean().optional({ nullable: true }),
 ];
+
+module.exports.validateSlippageBody = () => [
+  body("slippage").isInt(),
+];
