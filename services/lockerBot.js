@@ -608,6 +608,7 @@ class LockerBot {
 
       const msgInfo = {
         tokenA: tokenA,
+        tokenB: tokenB,
         text: text,
       };
 
@@ -645,6 +646,8 @@ class LockerBot {
     await this.client.sendMessage(-1001984948663, {
       message: message,
     })
+
+    // console.log(message)
   }
 
   async _logTokenPurchaseFailed(info){
@@ -653,6 +656,9 @@ class LockerBot {
     await this.client.sendMessage(-1001984948663, {
       message: message,
     })
+
+    // console.log(message)
+
   }
 
   async _makePurchase(token, { tokenB, pairAddress }, chainId, msgInfo) {
@@ -676,7 +682,7 @@ class LockerBot {
         tx: swapTx.transactionHash,
       });
 
-      await this._logTokenPurchased(chainId, pairAddress, msgInfo.tokenA, tokenB, msgInfo.text, swapTx.transactionHash);
+      await this._logTokenPurchased(chainId, pairAddress, msgInfo.tokenA, msgInfo.tokenB, msgInfo.text, swapTx.transactionHash);
 
     } catch (error) {
       // if swap fails, we should NOT try to buy again (because prices may drop)
@@ -874,6 +880,8 @@ class LockerBot {
     await this.client.sendMessage(-1001984948663, {
       message: message,
     })
+
+    // console.log(message)
   }
 
   async _logTokenSellFailed(sellInfo){
@@ -882,6 +890,8 @@ class LockerBot {
     await this.client.sendMessage(-1001984948663, {
       message: message,
     })
+
+    // console.log(message)
   }
 
   async _sell(pair, chainId) {
@@ -1014,10 +1024,14 @@ class LockerBot {
 
     let slippage;
 
-    if(matchedDetails.slippage == 0 || matchedDetails.slippage == null || matchedDetails.slippage == undefined){
+    if(matchedDetails == null || matchedDetails == undefined){
       slippage = this.slippage;
     } else {
-      slippage = matchedDetails.slippage;
+      if(matchedDetails.slippage == 0 || matchedDetails.slippage == null || matchedDetails.slippage == undefined){
+        slippage = this.slippage;
+      } else {
+        slippage = matchedDetails.slippage;
+      }
     }
 
     const minOutAmount = finalOutAmount.mul(new this.web3[chainId].utils.BN(slippage)).div(new this.web3[chainId].utils.BN(10000));
