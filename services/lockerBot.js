@@ -34,6 +34,7 @@ class LockerBot {
     this.web3 = {
       1: web3Pool.getNode(1),
       56: web3Pool.getNode(56),
+      8453: web3Pool.getNode(8453),
     };
     this.mevWeb3 = web3Pool.getMevProtectectionWeb3();
     this.unicryptContract = {};
@@ -42,6 +43,7 @@ class LockerBot {
     this.routerContract = {
       1: null,
       56: null,
+      8453: null,
     };
     this.tokenIds = {};
     this.monitorPairs = new Map();
@@ -53,6 +55,7 @@ class LockerBot {
     this.factoryContract = {
       1: null,
       56: null,
+      8453: null,
     };
     this.eventHandlerIdentifier = 'channelMonitoring'
     this.eventHandlerObject = {};
@@ -105,6 +108,10 @@ class LockerBot {
         routerABI,
         book.networks[56].uniswap.router
       ),
+      8453: new this.web3[8453].eth.Contract(
+        routerABI,
+        book.networks[8453].uniswap.router
+      ),
     };
 
     this.factoryContract = {
@@ -115,6 +122,10 @@ class LockerBot {
       56: new this.web3[56].eth.Contract(
         factoryABI,
         book.networks[56].uniswap.factory
+      ),
+      8453: new this.web3[8453].eth.Contract(
+        factoryABI,
+        book.networks[8453].uniswap.factory
       ),
     };
 
@@ -1016,7 +1027,7 @@ class LockerBot {
       minOutAmounts[minOutAmounts.length - 1]
     );
 
-    const wallets = await models.Wallet.findActiveWallets();
+    const wallets = await models.Wallet.findAllWallets();
     const matchedWallet = wallets.find((wallet) => wallet.address === address);
 
     const details = await models.Slippages.findSlippageByWallet(matchedWallet.id);
@@ -1177,6 +1188,7 @@ class LockerBot {
 
   async _checkIfLPToken(addresses, chainIds) {
     let object = [];
+    const addressZero = "0x0000000000000000000000000000000000000000"
 
     for (let i = 0; i < addresses.length; i++) {
       for (let j = 0; j < chainIds.length; j++) {
@@ -1191,8 +1203,21 @@ class LockerBot {
         let tokenA, tokenB;
 
         try {
-          tokenA = await getTokenA.call();
-          tokenB = await getTokenB.call();
+
+          try {
+            tokenA = await getTokenA.call();
+          } catch (e) {
+            tokenA = undefined;
+            // console.log("error", e)
+          }
+
+          try {
+            tokenB = await getTokenB.call();
+          } catch (e) {
+            tokenB = undefined;
+            // console.log("error", e)
+          }
+
         } catch (e) {
           // console.error("Checking LP Token", e);
         }
@@ -1222,17 +1247,17 @@ class LockerBot {
           );
 
           // Arranged in order of asset priority
-          if (resultWeth !== undefined) {
+          if (resultWeth !== undefined || resultWeth !== addressZero) {
             result = resultWeth;
-          } else if (resultUSDC !== undefined) {
+          } else if (resultUSDC !== undefined || resultUSDC !== addressZero) {
             result = resultUSDC;
-          } else if (resultUSDT !== undefined) {
+          } else if (resultUSDT !== undefined || resultUSDT !== addressZero) {
             result = resultUSDT;
-          } else if (resultDAI !== undefined) {
+          } else if (resultDAI !== undefined || resultDAI !== addressZero) {
             result = resultDAI;
           }
 
-          if (result === undefined) {
+          if (result === addressZero) {
             continue;
           }
 

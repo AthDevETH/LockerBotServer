@@ -32,10 +32,26 @@ const obj = {
         dai: "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56", // BUSD
       },
     },
+    8453: {
+      lockers: {
+
+      },
+      uniswap: {
+        router: "0x327Df1E6de05895d2ab08513aaDD9313Fe505d86",
+        factory: "0xFDa619b6d20975be80A10332cD39b9a4b0FAa8BB",
+      },
+      tokens: {
+        weth: "0x4200000000000000000000000000000000000006", // WETH
+        usdc: "0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA", // USDC
+        usdt: "", // USDT - not deployed
+        dai: "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb", // DAI
+      },
+    }
   },
   supportedNetworks: [
     { chaindId: 1, name: "eth" },
     { chaindId: 56, name: "bsc" },
+    { chaindId: 8453, name: "base" },
   ],
 };
 

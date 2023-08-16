@@ -14,4 +14,10 @@ module.exports = {
     USDT: Web3.utils.toChecksumAddress(book.networks[56].tokens.usdt),
     DAI: Web3.utils.toChecksumAddress(book.networks[56].tokens.dai),
   },
+  8453: {
+    WETH: Web3.utils.toChecksumAddress(book.networks[8453].tokens.weth),
+    USDC: Web3.utils.toChecksumAddress(book.networks[8453].tokens.usdc),
+    // USDT: Web3.utils.toChecksumAddress(book.networks[8453].tokens.usdt),
+    DAI: Web3.utils.toChecksumAddress(book.networks[8453].tokens.dai),
+  },
 };

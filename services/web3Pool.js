@@ -23,6 +23,10 @@ const DEFAULT_RPC_NODES = [
     url: "wss://late-radial-pine.bsc.discover.quiknode.pro/0775a8f112a7e5c30431e161161e894e59268132/",
     chainId: 56,
   },
+  {
+    url: "wss://black-little-market.base-mainnet.discover.quiknode.pro/33b7e9d83c72819413b5fefbab49506e9d1b192d/",
+    chainId: 8453,
+  }
 ];
 
 class Web3Pool {
@@ -80,6 +84,7 @@ class Web3Pool {
         new Web3.providers.HttpProvider("https://rpc.mevblocker.io")
       ),
       56: null,
+      8453: null,
     };
   }
 }
