@@ -1036,10 +1036,10 @@ class LockerBot {
     let slippage;
 
     if(matchedDetails == null || matchedDetails == undefined){
-      slippage = this.slippage;
+      slippage = this.slippageValue;
     } else {
       if(matchedDetails.slippage == 0 || matchedDetails.slippage == null || matchedDetails.slippage == undefined){
-        slippage = this.slippage;
+        slippage = this.slippageValue;
       } else {
         slippage = matchedDetails.slippage;
       }
