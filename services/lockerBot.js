@@ -1045,6 +1045,8 @@ class LockerBot {
       }
     }
 
+    console.log("slippage", slippage);
+
     const minOutAmount = finalOutAmount.mul(new this.web3[chainId].utils.BN(slippage)).div(new this.web3[chainId].utils.BN(10000));
     finalOutAmount = finalOutAmount.sub(minOutAmount).toString();
 
